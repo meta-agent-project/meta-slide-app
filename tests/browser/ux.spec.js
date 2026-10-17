@@ -33,5 +33,7 @@ test('all primary controls fit an 860px app panel',async({page})=>{
   const box=await page.locator(selector).boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(860);
  }
  await page.locator('#deleteBtn').click();await page.frameLocator('#canvas').locator('h1').click();
+ expect((await page.locator('#objectBadge').boundingBox()).height).toBeGreaterThanOrEqual(29);
+ expect((await page.locator('#resizeHandle').boundingBox()).width).toBeGreaterThanOrEqual(21);
  await page.screenshot({path:'validation/ux-editor.png'});
 });
