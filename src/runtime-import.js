@@ -25,7 +25,12 @@ function captureBridge(channel){
     for(const animation of root.getAnimations({subtree:true})){try{if(Number.isFinite(animation.effect.getComputedTiming().endTime))animation.finish();else{animation.currentTime=1000;animation.pause();}}catch{}}
     const copy=root.cloneNode(true),originals=[root,...root.querySelectorAll('*')],copies=[copy,...copy.querySelectorAll('*')];
     originals.forEach((el,i)=>{
-     const cs=getComputedStyle(el);if(cs.animationName!=='none'){copies[i].style.opacity=cs.opacity;copies[i].style.transform=cs.transform;}
+     const cs=getComputedStyle(el);
+     for(const animation of el.getAnimations())for(const keyframe of animation.effect?.getKeyframes()||[])for(const key of Object.keys(keyframe)){
+      if(['offset','easing','composite','computedOffset'].includes(key))continue;
+      const property=key.replace(/[A-Z]/g,c=>'-'+c.toLowerCase());
+      copies[i].style.setProperty(property,cs.getPropertyValue(property));
+     }
      if(el===root||el.matches('.slide')||el.closest('svg')&&el.tagName.toLowerCase()!=='svg')return;
      const shape=el.tagName.toLowerCase()==='svg'||el.tagName==='DIV'&&(cs.backgroundColor!=='rgba(0, 0, 0, 0)'&&cs.backgroundColor!=='transparent'||parseFloat(cs.borderTopWidth)>0);
      if(shape){
@@ -36,7 +41,8 @@ function captureBridge(channel){
     });
     copy.style.setProperty('--s','1');copy.style.setProperty('transform','none','important');copy.style.setProperty('position','relative','important');copy.style.setProperty('left','0','important');copy.style.setProperty('top','0','important');
     copy.querySelectorAll('script').forEach(el=>el.remove());
-    const head=[...document.head.querySelectorAll('style,link[rel="stylesheet"]')].map(el=>el.outerHTML).join('');
+    // Exported HTML often has a second title/style block inside body. Those styles still apply.
+    const head=[...document.querySelectorAll('style,link[rel="stylesheet"]')].map(el=>el.outerHTML).join('');
     send('page',{index,id:SLIDES[index].id,html:'<!doctype html><html><head><meta charset="utf-8">'+head+'<style>html,body{width:1280px;height:720px;margin:0!important;overflow:hidden!important}.stage{width:1280px!important;height:720px!important;border:0!important;box-shadow:none!important}sr-text{display:inline} [data-sr-source]{cursor:text}</style></head><body>'+copy.outerHTML+'</body></html>'});
     if(index+1<total){const next=document.querySelector('#next');if(!next||next.disabled)throw Error('다음 페이지로 이동할 수 없습니다.');next.click();}
    }

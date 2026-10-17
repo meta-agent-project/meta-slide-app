@@ -11,6 +11,9 @@ test('actual 41-page React deck: source-bound text survives original runtime nav
  await expect(page.locator('.slide-item')).toHaveCount(41,{timeout:120000});
  await expect(page.locator('#stage')).not.toHaveClass(/stage-loading/);
  const f=page.frameLocator('#canvas');const title=f.locator('h1,h2').first();
+ expect(await title.evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThan(45);
+ expect(await f.locator('svg rect').first().evaluate(el=>getComputedStyle(el).fill)).not.toBe('rgb(0, 0, 0)');
+ await expect(f.locator('svg .wire').first()).toHaveCSS('stroke-dashoffset','0px');
  await expect(f.locator('svg animateMotion')).toHaveCount(0);
  await expect(title).toBeVisible();await title.dblclick();
  await expect(f.locator('[contenteditable=true]')).toHaveCount(1);
