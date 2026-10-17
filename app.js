@@ -107,12 +107,22 @@ function bindDocument(){
   e.preventDefault();e.target.setPointerCapture?.(e.pointerId);
   startMove(e,el,false);
  });
- d.addEventListener('dblclick',e=>{e.preventDefault();const el=e.target.closest('td,th')||targetAt(e);if(isText(el))beginEdit(el);else if(el?.tagName==='IMG'){$('#imageFile').dataset.replace='true';$('#imageFile').click();}});
+ d.addEventListener('dblclick',e=>{if(editing?.contains(e.target))return;e.preventDefault();const el=e.target.closest('td,th')||targetAt(e);if(isText(el))beginEdit(el,{x:e.clientX,y:e.clientY});else if(el?.tagName==='IMG'){$('#imageFile').dataset.replace='true';$('#imageFile').click();}});
  d.addEventListener('keydown',keyboard);
  d.addEventListener('paste',e=>{if(!editing)return;e.preventDefault();d.execCommand('insertText',false,e.clipboardData.getData('text/plain'));});
  new ResizeObserver(updateBox).observe(d.body);
 }
-function beginEdit(el){finishEdit();select(el);editing=el;el.contentEditable='true';el.focus();$('#selectionBox').hidden=true;el.addEventListener('blur',()=>{if(editing===el)finishEdit();},{once:true});}
+function beginEdit(el,point){
+ finishEdit();select(el);editing=el;el.contentEditable='true';el.focus({preventScroll:true});$('#selectionBox').hidden=true;
+ if(point){
+  const d=el.ownerDocument;let range;
+  // Pointer coordinates belong to the iframe viewport, including at editor zoom.
+  if(d.caretPositionFromPoint){const caret=d.caretPositionFromPoint(point.x,point.y);if(caret){range=d.createRange();range.setStart(caret.offsetNode,caret.offset);}}
+  else range=d.caretRangeFromPoint?.(point.x,point.y);
+  if(range&&el.contains(range.startContainer)){range.collapse(true);const selection=d.getSelection();selection.removeAllRanges();selection.addRange(range);}
+ }
+ el.addEventListener('blur',()=>{if(editing===el)finishEdit();},{once:true});
+}
 function finishEdit(){if(!editing)return;editing.removeAttribute('contenteditable');editing=null;commit();updateBox();}
 function translate(el,dx,dy){
  const cs=el.ownerDocument.defaultView.getComputedStyle(el),tokens=(cs.translate==='none'?'0px 0px':cs.translate).match(/calc\([^)]*\)|[^\s]+/g),x=tokens[0]||'0px',y=tokens[1]||'0px',z=tokens[2]?' '+tokens[2]:'';
