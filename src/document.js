@@ -60,7 +60,7 @@ export function editorHTML(html) {
  // Explicit dimensions keep its selectable footprint; a separate opaque iframe renders it live.
  for(const el of d.querySelectorAll('canvas')){el.style.display='block';if(!el.style.width)el.style.width=(el.getAttribute('width')||300)+'px';if(!el.style.height)el.style.height=(el.getAttribute('height')||150)+'px';}
  const csp=d.createElement('meta');csp.httpEquiv='Content-Security-Policy';csp.content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";d.head.prepend(csp);
- const style=d.createElement('style');style.dataset.editorOnly='';style.textContent='html{scrollbar-width:none}body{overflow:hidden!important}*{animation-play-state:paused!important;caret-color:#5364e8}[contenteditable=true]{outline:2px solid #6370ef!important;cursor:text!important} a{cursor:default}';d.head.append(style);
+ const style=d.createElement('style');style.dataset.editorOnly='';style.textContent='html{scrollbar-width:none}body{overflow:hidden!important}*{animation-play-state:paused!important;caret-color:#5364e8}[contenteditable=true]{outline:2px solid #6370ef!important;cursor:text!important} [data-sr-id]{cursor:grab!important;user-select:none}[contenteditable=true],[contenteditable=true] *{cursor:text!important;user-select:text!important}html[data-sr-dragging] *{cursor:grabbing!important;user-select:none!important}html[data-sr-dragging=resize] *{cursor:nwse-resize!important}';d.head.append(style);
  return serialize(d);
 }
 export function blankSlide(name='빈 슬라이드') {
