@@ -7,6 +7,7 @@ const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=
 export const server=http.createServer(async(req,res)=>{
  try {
   const relative=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
+  if(relative==='/healthz'){res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({app:'slide-room',version:'0.1.0'}));return;}
   const file=path.resolve(root,'.'+(relative==='/'?'/index.html':relative));
   if(!file.startsWith(root+path.sep)||relative.split('/').some(p=>p.startsWith('.')||p==='node_modules')) {res.writeHead(403);res.end();return;}
   if(!(await stat(file)).isFile())throw Error('not a file');

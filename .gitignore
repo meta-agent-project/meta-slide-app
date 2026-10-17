@@ -11,4 +11,5 @@ playwright-report/
 Thumbs.db
 .playwright-mcp/
 validation/
+.local/
 
