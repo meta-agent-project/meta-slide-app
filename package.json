@@ -9,5 +9,10 @@
     "test:e2e": "playwright test",
     "check": "npm test && npm run test:e2e"
   },
-  "devDependencies": { "@playwright/test": "^1.56.0" }
+  "devDependencies": {
+    "@playwright/test": "^1.56.0"
+  },
+  "dependencies": {
+    "acorn": "^8.15.0"
+  }
 }

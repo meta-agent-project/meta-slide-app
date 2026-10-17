@@ -1,4 +1,5 @@
 import {prepareImport,normalizeReveal} from './import-adapters.js';
+import {exportRuntimeHTML} from './runtime-import.js';
 const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;').replaceAll('>','&gt;');
 export const uid=()=>crypto.randomUUID();
 export const parse=html=>new DOMParser().parseFromString(html,'text/html');
@@ -75,6 +76,7 @@ export function initialProject() {
  markElements(d);slide.html=serialize(d);return {version:1,title:'나의 첫 번째 강의',slides:[slide]};
 }
 export function exportHTML(project) {
+ if(project.runtime)return exportRuntimeHTML(project);
  const data=JSON.stringify(project).replaceAll('<','\\u003c');
  const frames=project.slides.map((s,i)=>`<iframe title="${esc(s.name)}" sandbox="allow-scripts" srcdoc="${esc(s.html)}" ${i?'hidden':''}></iframe>`).join('\n');
  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(project.title)}</title><style>*{box-sizing:border-box}body{margin:0;background:#171c27;color:white;font:14px sans-serif;display:grid;place-items:center;height:100vh;overflow:hidden}#deck{position:relative;width:1280px;height:720px;flex-shrink:0;transform-origin:center}iframe{border:0;width:1280px;height:720px;background:white;position:absolute;inset:0}[hidden]{display:none!important}nav{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);background:#182231db;border-radius:9px;padding:8px;display:flex;gap:18px;align-items:center}button{border:0;border-radius:5px;background:#354057;color:white;padding:7px 16px;cursor:pointer}</style></head><body><main id="deck">${frames}</main><nav><button id="prev" aria-label="이전 슬라이드">←</button><span id="counter"></span><button id="next" aria-label="다음 슬라이드">→</button></nav><script id="slide-room-project" type="application/json">${data}</script><script>const frames=[...document.querySelectorAll('iframe')];let current=0;function show(n){current=Math.max(0,Math.min(frames.length-1,n));frames.forEach((f,i)=>f.hidden=i!==current);document.getElementById('counter').textContent=(current+1)+' / '+frames.length}document.getElementById('prev').onclick=()=>show(current-1);document.getElementById('next').onclick=()=>show(current+1);addEventListener('keydown',e=>{if(['ArrowRight','PageDown',' '].includes(e.key))show(current+1);if(['ArrowLeft','PageUp'].includes(e.key))show(current-1)});function fit(){document.getElementById('deck').style.transform='scale('+Math.min(innerWidth/1280,(innerHeight-56)/720)+')'}addEventListener('resize',fit);fit();show(0);<\/script></body></html>`;

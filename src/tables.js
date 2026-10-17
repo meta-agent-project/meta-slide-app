@@ -31,11 +31,12 @@ export function setup(editor) {
   for(const td of active.querySelectorAll('td,th')){const s=coords(td);if(s.r>=Math.min(anchor.r,end.r)&&s.r<=Math.max(anchor.r,end.r)&&s.c>=Math.min(anchor.c,end.c)&&s.c<=Math.max(anchor.c,end.c))td.dataset.cellSelected='';}
  }
  function bind(){
+  if(editor.project.runtime)return;
   const style=editor.document.createElement('style');style.dataset.editorOnly='';style.textContent='[data-cell-selected]{outline:2px solid #6370ef;outline-offset:-3px}';editor.document.head.append(style);
   editor.document.addEventListener('pointerdown',e=>{const td=e.target.closest('td,th');if(!td)return;const table=td.closest('table'),s=coords(td);if(active!==table||!e.shiftKey||!anchor)anchor={r:s.r,c:s.c};active=table;end={r:s.r+s.rowspan-1,c:s.c+s.colspan-1};highlight();},true);
  }
  document.addEventListener('slide-ready',()=>{active=null;anchor=null;end=null;bind();});bind();
- document.addEventListener('object-selected',({detail:el})=>{const table=el?.closest('table');$('#tableProps').hidden=!table;if(active!==table){active=table;anchor=null;end=null;}});
+ document.addEventListener('object-selected',({detail:el})=>{const table=editor.project.runtime?null:el?.closest('table');$('#tableProps').hidden=!table;if(active!==table){active=table;anchor=null;end=null;}});
  $('#tableBtn').onclick=()=>{
   editor.finishEdit();const t=editor.document.createElement('table');t.dataset.srId=uid();t.dataset.kind='table';t.style.cssText='position:absolute;left:180px;top:180px;width:660px;height:240px;border-collapse:collapse;table-layout:fixed;font-size:24px;color:#253f38;background:white;';
   writeTable(t,makeTable(3,3));(editor.document.querySelector('[data-sr-page]')||editor.document.body).append(t);editor.select(t);active=t;anchor={r:0,c:0};end={r:0,c:0};editor.commit();highlight();
