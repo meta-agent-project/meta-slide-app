@@ -36,7 +36,8 @@ export function importHTML(html,name='새 강의',selector='') {
    for(const id of rootIds)if(id!==rootIds[i])d.querySelector(`[data-sr-id="${id}"]`)?.remove();
    const active=d.querySelector(`[data-sr-id="${rootIds[i]}"]`);
    active.setAttribute('data-sr-page','');
-   active.style.setProperty('display',getDisplay(root),'important');
+   if(active.style.display==='none')active.style.removeProperty('display');
+   active.removeAttribute('hidden');
    active.style.setProperty('visibility','visible','important');
    active.classList.add('active');
    // Existing deck containers may translate to another page. A single page is shown at its own origin.
@@ -46,7 +47,6 @@ export function importHTML(html,name='새 강의',selector='') {
  });
  return {version:1,title:name.replace(/\.(html?|json)$/i,''),slides};
 }
-function getDisplay(root){return /display\s*:\s*(grid|flex)/.exec(root.getAttribute('style')||'')?.[1] || 'block';}
 export function editorHTML(html) {
  const d=parse(html);
  d.querySelectorAll('script,base,meta[http-equiv],object,embed').forEach(el=>{

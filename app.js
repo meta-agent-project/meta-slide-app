@@ -40,6 +40,8 @@ async function render(){
  const version=++loadVersion;selected=null;editing=null;$('#selectionBox').hidden=true;$('#projectName').value=project.title;renderSlides();updateHistory();
  await new Promise(resolve=>{canvas.onload=resolve;canvas.srcdoc=editorHTML(current().html);});
  if(version!==loadVersion)return;
+ const pageRoot=doc().querySelector('[data-sr-page]');
+ if(pageRoot&&doc().defaultView.getComputedStyle(pageRoot).display==='none')pageRoot.style.setProperty('display','block','important');
  bindDocument();fit();select(null);renderLayers();
  document.dispatchEvent(new Event('slide-ready'));
 }
@@ -82,6 +84,7 @@ function bindDocument(){
   if(editing?.contains(e.target))return;
   finishEdit();const el=targetAt(e);select(el);if(!el)return;
   if(e.button!==0)return;
+  e.preventDefault();el.setPointerCapture?.(e.pointerId);
   startMove(e,el,false);
  });
  d.addEventListener('dblclick',e=>{e.preventDefault();const el=e.target.closest('td,th')||targetAt(e);if(isText(el))beginEdit(el);else if(el?.tagName==='IMG'){$('#imageFile').dataset.replace='true';$('#imageFile').click();}});
@@ -107,7 +110,7 @@ function startMove(e,el,resize){
  const end=()=>{surface.removeEventListener('pointermove',move);surface.removeEventListener('pointerup',end);if(moved)commit();};
  surface.addEventListener('pointermove',move);surface.addEventListener('pointerup',end,{once:true});
 }
-$('#resizeHandle').onpointerdown=e=>{e.preventDefault();if(selected)startMove(e,selected,true);};
+$('#resizeHandle').onpointerdown=e=>{e.preventDefault();e.target.setPointerCapture(e.pointerId);if(selected)startMove(e,selected,true);};
 function changeStyle(property,value){if(!selected)return;selected.style.setProperty(property,value,'important');commit();select(selected);}
 function add(kind){
  finishEdit();const d=doc(),el=d.createElement(kind==='text'?'p':'div');el.dataset.srId=uid();el.dataset.kind=kind;el.style.cssText='position:absolute;left:120px;top:120px;width:320px;height:160px;box-sizing:border-box;';
@@ -166,3 +169,4 @@ await restore();
 export const editor={get document(){return doc();},get selected(){return selected;},get project(){return project;},get index(){return index;},select,commit,toast,finishEdit,beginEdit,render,download,add};
 (await import('./src/media.js')).setup(editor);
 (await import('./src/tables.js')).setup(editor);
+(await import('./src/assets.js')).setup(editor);
