@@ -32,3 +32,10 @@ test('uploaded video plays in preview and survives export',async({page})=>{
  await v.evaluate(async el=>{el.muted=true;await el.play();});await expect.poll(()=>v.evaluate(el=>el.currentTime)).toBeGreaterThan(0);
  await page.locator('#closePreview').click();const promise=page.waitForEvent('download');await page.locator('#exportBtn').click();const dl=await promise;let html='';for await(const c of await dl.createReadStream())html+=c;expect(html).toContain('data:video/webm;base64,');
 });
+test('document load handlers remain inactive during editing and survive export',async({page,context})=>{
+ await page.goto('/');await page.locator('#projectFile').setInputFiles({name:'load.html',mimeType:'text/html',buffer:Buffer.from('<body onload="document.body.dataset.loaded=\'yes\'"><h1>로드 이벤트</h1></body>')});
+ await expect(page.frameLocator('#canvas').locator('h1')).toHaveText('로드 이벤트');
+ expect(await page.frameLocator('#canvas').locator('body').getAttribute('data-loaded')).toBeNull();
+ const promise=page.waitForEvent('download');await page.locator('#exportBtn').click();const dl=await promise;let html='';for await(const c of await dl.createReadStream())html+=c;
+ const preview=await context.newPage();await preview.setContent(html);await expect(preview.frameLocator('#deck iframe').locator('body')).toHaveAttribute('data-loaded','yes');
+});
