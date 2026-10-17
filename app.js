@@ -7,6 +7,7 @@ let originalInput='',dirty=false,runtimeObjects=[];
 $('#stage').innerHTML='<iframe id="canvas" title="슬라이드 편집 화면" sandbox="allow-same-origin"></iframe><div id="selectionBox" hidden><button id="resizeHandle" aria-label="크기 조절"></button><span id="objectBadge"></span></div>';
 const canvas=$('#canvas');
 $('#openBtn').insertAdjacentHTML('afterend','<button id="saveBtn">저장</button>');
+$('#openBtn').insertAdjacentHTML('beforebegin','<button id="newBtn">새 작업</button>');
 $('#addSlide').insertAdjacentHTML('afterend','<div class="slide-actions"><button id="duplicateSlide" title="슬라이드 복제">복제</button><button id="slideUp" title="슬라이드 위로">↑</button><button id="slideDown" title="슬라이드 아래로">↓</button></div>');
 $('#elementProps').insertAdjacentHTML('beforeend','<section><h3>테두리</h3><div class="text-tools"><input type="number" id="borderWidth" min="0" max="30" aria-label="테두리 두께"><input type="color" id="borderColor" aria-label="테두리 색상" value="#253f38"></div></section><button id="parentBtn">상위 묶음 선택 ↑</button>');
 $('#removeSlide').insertAdjacentHTML('beforebegin','<section><h3>오브젝트 <span class="muted">내부 요소도 선택 가능</span></h3><div id="layers"></div></section>');
@@ -16,7 +17,7 @@ $('#stageArea').insertAdjacentHTML('beforebegin','<div id="importNotice" hidden>
 function toast(msg){$('#toast').textContent=msg;$('#toast').style.opacity=1;clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').style.opacity=0,4000);}
 const current=()=>project.slides[index];
 const doc=()=>canvas.contentDocument;
-function nodeName(el){return el?.dataset.kind||({svg:'SVG · 묶음',IMG:'이미지',VIDEO:'영상',IFRAME:'외부 콘텐츠',TABLE:'표',TD:'표 셀',TH:'표 셀',DIV:'묶음',SECTION:'묶음'}[el?.tagName])||el?.tagName?.toLowerCase()||'슬라이드 배경';}
+function nodeName(el){return ({text:'텍스트',image:'이미지',video:'영상',rect:'사각형',rounded:'둥근 사각형',circle:'원',line:'선',arrow:'화살표',table:'표',group:'묶음'}[el?.dataset.kind])||({svg:'SVG · 묶음',IMG:'이미지',VIDEO:'영상',CANVAS:'동적 그림',IFRAME:'외부 콘텐츠',TABLE:'표',TD:'표 셀',TH:'표 셀',DIV:'묶음',SECTION:'묶음',H1:'제목',H2:'제목',H3:'제목',P:'본문',SPAN:'글자'}[el?.tagName])||el?.tagName?.toLowerCase()||'슬라이드 배경';}
 function isText(el){return el && !el.closest('svg')&&!['IMG','VIDEO','IFRAME','CANVAS','TABLE'].includes(el.tagName)&&(!el.children.length||/^(H[1-6]|P|SPAN|LI|TD|TH|BLOCKQUOTE)$/.test(el.tagName))&&!['rect','rounded','circle','line','arrow'].includes(el.dataset.kind);}
 function takeSnapshot(){
  if(!doc()?.body)return;
@@ -107,7 +108,15 @@ function bindDocument(){
 }
 function beginEdit(el){finishEdit();select(el);editing=el;el.contentEditable='true';el.focus();$('#selectionBox').hidden=true;el.addEventListener('blur',()=>{if(editing===el)finishEdit();},{once:true});}
 function finishEdit(){if(!editing)return;editing.removeAttribute('contenteditable');editing=null;commit();updateBox();}
-function translate(el,dx,dy){const values=(el.style.translate||'0px 0px').split(' ');el.style.translate=`${(parseFloat(values[0])||0)+dx}px ${(parseFloat(values[1])||0)+dy}px`;}
+function translate(el,dx,dy){
+ const cs=el.ownerDocument.defaultView.getComputedStyle(el),tokens=(cs.translate==='none'?'0px 0px':cs.translate).match(/calc\([^)]*\)|[^\s]+/g),x=tokens[0]||'0px',y=tokens[1]||'0px',z=tokens[2]?' '+tokens[2]:'';
+ const apply=(a,b)=>el.style.setProperty('translate',`calc(${x} + ${a}px) calc(${y} + ${b}px)${z}`,'important');
+ // Measure the parent transform basis, so screen-coordinate movement also works
+ // inside scaled/rotated groups and preserves pre-existing percentage translates.
+ const origin=getRect(el);apply(1,0);const px=getRect(el);apply(0,1);const py=getRect(el);
+ const ax=px.x-origin.x,ay=px.y-origin.y,bx=py.x-origin.x,by=py.y-origin.y,det=ax*by-ay*bx;
+ if(Math.abs(det)>.00001)apply((dx*by-dy*bx)/det,(dy*ax-dx*ay)/det);else apply(dx,dy);
+}
 function startMove(e,el,resize){
  const start={x:e.clientX,y:e.clientY},r=getRect(el),style=el.style.cssText;
  const inside=e.view===doc().defaultView;let moved=false;
@@ -164,6 +173,7 @@ for(const [id,d]of [['slideUp',-1],['slideDown',1]])$('#'+id).onclick=()=>{finis
 $('#projectName').onchange=e=>{project.title=e.target.value.trim()||'새 강의';commit();};
 $('#zoomIn').onclick=()=>{zoom=Math.min(3,zoom+.15);fit();};$('#zoomOut').onclick=()=>{zoom=Math.max(.3,zoom-.15);fit();};$('#fitBtn').onclick=()=>{zoom=1;fit();};new ResizeObserver(fit).observe($('#stageArea'));
 $('#openBtn').onclick=()=>$('#projectFile').click();
+$('#newBtn').onclick=()=>{finishEdit();project={version:1,title:'새 강의',slides:[blankSlide()]};index=0;originalInput='';$('#importNotice').hidden=true;commit({capture:false});render();};
 $('#projectFile').onchange=async e=>{try{const file=e.target.files[0];if(!file)return;finishEdit();originalInput=await file.text();const next=importHTML(originalInput,file.name);project=next;history=new History(project);index=0;await render();saveLocal();toast(`${project.slides.length}개 슬라이드를 불러왔습니다.`);$('#importNotice').hidden=false;$('#importNotice').innerHTML='<span>원본 HTML을 유지하며 편집합니다. 페이지 구분이 다르면 선택자를 지정하세요.</span> <button id="pageSelectorBtn">페이지 구분</button>';$('#pageSelectorBtn').onclick=()=>{const selector=prompt('페이지 요소의 CSS 선택자 (예: .slide 또는 section)');if(selector){try{project=importHTML(originalInput,file.name,selector);history=new History(project);index=0;render();saveLocal();}catch(err){toast(err.message);}}};}catch(err){toast('불러오기 실패: '+err.message);}finally{e.target.value='';}};
 function download(data,name,type){const url=URL.createObjectURL(new Blob([data],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
 function saveProject(){finishEdit();takeSnapshot();download(JSON.stringify(project,null,2),project.title+'.slide.json','application/json');saveLocal();toast('편집용 프로젝트를 저장했습니다.');}

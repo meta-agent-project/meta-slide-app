@@ -3,9 +3,10 @@ export const uid=()=>crypto.randomUUID();
 export const parse=html=>new DOMParser().parseFromString(html,'text/html');
 export const serialize=doc=>'<!doctype html>\n'+doc.documentElement.outerHTML;
 export function markElements(doc) {
+ const seen=new Set();
  for(const el of doc.body.querySelectorAll('*')) {
   if(!['SCRIPT','STYLE','LINK','META','SOURCE','BR','PATH','RECT','CIRCLE','DEFS','STOP','LINE','POLYGON'].includes(el.tagName.toUpperCase()) && !el.closest('svg')?.isSameNode(el.parentElement?.closest('svg'))) {
-   if(!el.hasAttribute('data-sr-id'))el.setAttribute('data-sr-id',uid());
+   let id=el.getAttribute('data-sr-id');if(!id||!/^[-a-zA-Z0-9_]+$/.test(id)||seen.has(id)){id=uid();el.setAttribute('data-sr-id',id);}seen.add(id);
   }
  }
 }
@@ -13,13 +14,13 @@ export function importHTML(html,name='새 강의',selector='') {
  if(/^\s*\{/.test(html)) {
   const p=JSON.parse(html);
   if(p.version!==1||!Array.isArray(p.slides)||!p.slides.length||p.slides.some(s=>typeof s.html!=='string'))throw Error('프로젝트 파일 형식이 올바르지 않습니다.');
-  p.slides.forEach(s=>s.id||=uid()); return p;
+  p.slides.forEach(s=>{s.id||=uid();const d=parse(s.html);markElements(d);s.html=serialize(d);});p.title=String(p.title||'새 강의'); return p;
  }
  const doc=parse(html), embedded=doc.getElementById('slide-room-project');
  if(embedded) {
   const p=JSON.parse(embedded.textContent);
   if(p.version!==1 || !Array.isArray(p.slides)||!p.slides.length||p.slides.some(s=>typeof s.html!=='string'))throw Error('지원하지 않는 프로젝트 형식입니다.');
-  p.slides.forEach(s=>{s.id ||=uid();}); return p;
+  p.slides.forEach(s=>{s.id ||=uid();const d=parse(s.html);markElements(d);s.html=serialize(d);});p.title=String(p.title||'새 강의');return p;
  }
  doc.querySelectorAll('base,meta[http-equiv]').forEach(e=>e.remove());
  markElements(doc);
