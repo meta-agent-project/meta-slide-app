@@ -42,7 +42,7 @@ export function importHTML(html,name='새 강의',selector='') {
    active.style.setProperty('visibility','visible','important');
    active.classList.add('active');
    // Existing deck containers may translate to another page. A single page is shown at its own origin.
-   const st=d.createElement('style');st.setAttribute('data-sr-page-style','');st.textContent='html,body{margin:0!important;overflow:hidden!important} [data-sr-page]{margin:0!important;box-sizing:border-box;min-height:720px}';d.head.append(st);
+   const st=d.createElement('style');st.setAttribute('data-sr-page-style','');st.textContent='html,body{margin:0!important;overflow:hidden!important} [data-sr-page]{margin:0!important;box-sizing:border-box}';d.head.append(st);
   }
   return {id:uid(),name:root.querySelector('h1,h2,h3')?.textContent?.slice(0,45)||`슬라이드 ${i+1}`,html:serialize(d)};
  });

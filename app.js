@@ -11,6 +11,7 @@ $('#openBtn').insertAdjacentHTML('beforebegin','<button id="newBtn">새 작업</
 $('#addSlide').insertAdjacentHTML('afterend','<div class="slide-actions"><button id="duplicateSlide" title="슬라이드 복제">복제</button><button id="slideUp" title="슬라이드 위로">↑</button><button id="slideDown" title="슬라이드 아래로">↓</button></div>');
 $('#elementProps').insertAdjacentHTML('beforeend','<section><h3>테두리</h3><div class="text-tools"><input type="number" id="borderWidth" min="0" max="30" aria-label="테두리 두께"><input type="color" id="borderColor" aria-label="테두리 색상" value="#253f38"></div></section><button id="parentBtn">상위 묶음 선택 ↑</button>');
 $('#removeSlide').insertAdjacentHTML('beforebegin','<section><h3>오브젝트 <span class="muted">내부 요소도 선택 가능</span></h3><div id="layers"></div></section>');
+$('#removeSlide').insertAdjacentHTML('beforebegin','<button id="opaqueBtn" title="복잡한 HTML을 원형 그대로 하나의 오브젝트로 다룹니다. 실행 취소로 되돌릴 수 있습니다.">페이지 통째로 묶기</button>');
 $('#imageBtn').insertAdjacentHTML('afterend','<select id="shapeSelect" aria-label="추가 도형"><option value="">도형 더보기</option value="rounded">둥근 사각형</option><option value="line">선</option><option value="arrow">화살표</option></select>');
 $('.toolbar>span')?.remove();
 $('#stageArea').insertAdjacentHTML('beforebegin','<div id="importNotice" hidden></div>');
@@ -45,6 +46,10 @@ async function render(){
  if(version!==loadVersion)return;
  const pageRoot=doc().querySelector('[data-sr-page]');
  if(pageRoot&&doc().defaultView.getComputedStyle(pageRoot).display==='none')pageRoot.style.setProperty('display','block','important');
+ if(pageRoot&&!pageRoot.hasAttribute('data-sr-fitted')){
+  const r=getRect(pageRoot),ratio=r.width/r.height;
+  if(r.width>0&&r.height>0&&Math.abs(ratio-16/9)<.12){const factor=Math.min(1280/r.width,720/r.height);if(Math.abs(factor-1)>.01){doc().documentElement.style.zoom=String(factor);pageRoot.dataset.srFitted='';takeSnapshot();renderSlides();}}
+ }
  bindDocument();fit();select(null);renderLayers();syncRuntime();
  document.dispatchEvent(new Event('slide-ready'));
 }
@@ -114,9 +119,18 @@ function translate(el,dx,dy){
  const apply=(a,b)=>el.style.setProperty('translate',`calc(${x} + ${a}px) calc(${y} + ${b}px)${z}`,'important');
  // Measure the parent transform basis, so screen-coordinate movement also works
  // inside scaled/rotated groups and preserves pre-existing percentage translates.
- const origin=getRect(el);apply(1,0);const px=getRect(el);apply(0,1);const py=getRect(el);
- const ax=px.x-origin.x,ay=px.y-origin.y,bx=py.x-origin.x,by=py.y-origin.y,det=ax*by-ay*bx;
+ const origin=getRect(el);apply(64,0);const px=getRect(el);apply(0,64);const py=getRect(el);
+ const ax=(px.x-origin.x)/64,ay=(px.y-origin.y)/64,bx=(py.x-origin.x)/64,by=(py.y-origin.y)/64,det=ax*by-ay*bx;
  if(Math.abs(det)>.00001)apply((dx*by-dy*bx)/det,(dy*ax-dx*ay)/det);else apply(dx,dy);
+}
+function resizeTo(el,width,height){
+ const cs=el.ownerDocument.defaultView.getComputedStyle(el),border=cs.boxSizing==='border-box';
+ const w=(parseFloat(cs.width)||el.offsetWidth||getRect(el).width)+(border?0:(parseFloat(cs.paddingLeft)||0)+(parseFloat(cs.paddingRight)||0)+(parseFloat(cs.borderLeftWidth)||0)+(parseFloat(cs.borderRightWidth)||0));
+ const h=(parseFloat(cs.height)||el.offsetHeight||getRect(el).height)+(border?0:(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0)+(parseFloat(cs.borderTopWidth)||0)+(parseFloat(cs.borderBottomWidth)||0));
+ const apply=(a,b)=>{el.style.boxSizing='border-box';el.style.setProperty('width',Math.max(1,a)+'px','important');el.style.setProperty('height',Math.max(1,b)+'px','important');};
+ apply(w,h);const r=getRect(el);apply(w+64,h);const rw=getRect(el);apply(w,h+64);const rh=getRect(el);
+ const ax=(rw.width-r.width)/64,ay=(rw.height-r.height)/64,bx=(rh.width-r.width)/64,by=(rh.height-r.height)/64,det=ax*by-ay*bx,dx=width-r.width,dy=height-r.height;
+ if(Math.abs(det)>.00001)apply(w+(dx*by-dy*bx)/det,h+(dy*ax-dx*ay)/det);else apply(w*width/Math.max(1,r.width),h*height/Math.max(1,r.height));
 }
 function startMove(e,el,resize){
  const start={x:e.clientX,y:e.clientY},r=getRect(el),style=el.style.cssText;
@@ -126,7 +140,7 @@ function startMove(e,el,resize){
   const dx=(ev.clientX-start.x)/(inside?1:scale),dy=(ev.clientY-start.y)/(inside?1:scale);
   if(Math.abs(dx)+Math.abs(dy)<3&&!moved)return;
   moved=true;ev.preventDefault();el.style.cssText=style;
-  if(resize){el.style.setProperty('box-sizing','border-box');el.style.setProperty('width',Math.max(20,r.width+dx)+'px','important');el.style.setProperty('height',Math.max(20,r.height+dy)+'px','important');}
+  if(resize){resizeTo(el,Math.max(20,r.width+dx),Math.max(20,r.height+dy));}
   else translate(el,dx,dy);
   select(el);
  };
@@ -158,7 +172,7 @@ document.addEventListener('keydown',keyboard);
 $$('[data-add]').forEach(b=>b.onclick=()=>add(b.dataset.add));$('#shapeSelect').onchange=e=>{if(e.target.value)add(e.target.value);e.target.value='';};
 $('#duplicateBtn').onclick=duplicate;$('#deleteBtn').onclick=remove;$('#undoBtn').onclick=()=>undo();$('#redoBtn').onclick=()=>undo(true);
 for(const [id,axis]of [['propX','x'],['propY','y']])$('#'+id).onchange=e=>{if(!selected)return;const n=Number(e.target.value);if(!Number.isFinite(n))return;const r=getRect(selected);translate(selected,axis==='x'?n-r.x:0,axis==='y'?n-r.y:0);commit();select(selected);};
-for(const [id,prop]of [['propW','width'],['propH','height']])$('#'+id).onchange=e=>{if(!selected)return;selected.style.boxSizing='border-box';changeStyle(prop,Math.max(20,Number(e.target.value)||20)+'px');};
+for(const [id,prop]of [['propW','width'],['propH','height']])$('#'+id).onchange=e=>{if(!selected)return;const r=getRect(selected),value=Math.max(20,Number(e.target.value)||20);resizeTo(selected,prop==='width'?value:r.width,prop==='height'?value:r.height);commit();select(selected);};
 $('#fontSize').onchange=e=>changeStyle('font-size',Math.max(8,Math.min(200,+e.target.value))+'px');$('#fontFamily').onchange=e=>changeStyle('font-family',e.target.value);$('#boldBtn').onclick=()=>changeStyle('font-weight',Number(doc().defaultView.getComputedStyle(selected).fontWeight)>=600?'400':'700');
 $('#alignBtn').onclick=()=>{if(selected){const a=doc().defaultView.getComputedStyle(selected).textAlign;changeStyle('text-align',a==='center'?'right':a==='right'?'left':'center');}};
 function color(value){const target=selected||doc().querySelector('[data-sr-page]')||doc().body;target.style.setProperty(isText(selected)?'color':'background-color',value,'important');commit();select(selected);}
@@ -175,6 +189,7 @@ $('#projectName').onchange=e=>{project.title=e.target.value.trim()||'새 강의'
 $('#zoomIn').onclick=()=>{zoom=Math.min(3,zoom+.15);fit();};$('#zoomOut').onclick=()=>{zoom=Math.max(.3,zoom-.15);fit();};$('#fitBtn').onclick=()=>{zoom=1;fit();};new ResizeObserver(fit).observe($('#stageArea'));
 $('#openBtn').onclick=()=>$('#projectFile').click();
 $('#newBtn').onclick=()=>{finishEdit();project={version:1,title:'새 강의',slides:[blankSlide()]};index=0;originalInput='';$('#importNotice').hidden=true;commit({capture:false});render();};
+$('#opaqueBtn').onclick=()=>{finishEdit();takeSnapshot();const source=current().html,d=parse(blankSlide().html),frame=d.createElement('iframe');frame.dataset.srId=uid();frame.dataset.kind='group';frame.title=current().name;frame.setAttribute('sandbox','allow-scripts');frame.srcdoc=source;frame.style.cssText='position:absolute;left:0;top:0;width:1280px;height:720px;border:0;';d.body.append(frame);current().html=serialize(d);commit({capture:false});render();toast('페이지를 하나의 오브젝트로 묶었습니다. 실행 취소로 되돌릴 수 있습니다.');};
 $('#projectFile').onchange=async e=>{try{const file=e.target.files[0];if(!file)return;finishEdit();originalInput=await file.text();const next=importHTML(originalInput,file.name);project=next;history=new History(project);index=0;await render();saveLocal();toast(`${project.slides.length}개 슬라이드를 불러왔습니다.`);$('#importNotice').hidden=false;$('#importNotice').innerHTML='<span>원본 HTML을 유지하며 편집합니다. 페이지 구분이 다르면 선택자를 지정하세요.</span> <button id="pageSelectorBtn">페이지 구분</button>';$('#pageSelectorBtn').onclick=()=>{const selector=prompt('페이지 요소의 CSS 선택자 (예: .slide 또는 section)');if(selector){try{project=importHTML(originalInput,file.name,selector);history=new History(project);index=0;render();saveLocal();}catch(err){toast(err.message);}}};}catch(err){toast('불러오기 실패: '+err.message);}finally{e.target.value='';}};
 function download(data,name,type){const url=URL.createObjectURL(new Blob([data],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
 function saveProject(){finishEdit();takeSnapshot();download(JSON.stringify(project,null,2),project.title+'.slide.json','application/json');saveLocal();toast('편집용 프로젝트를 저장했습니다.');}

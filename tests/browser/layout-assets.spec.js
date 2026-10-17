@@ -27,3 +27,9 @@ test('iframe editor does not run event attributes and preview cannot access pare
  const content=page.frameLocator('#previewFrame').frameLocator('#deck iframe');
  await expect(content.locator('body')).toHaveAttribute('data-isolated','yes');expect(await page.locator('body').getAttribute('data-compromised')).toBeNull();
 });
+test('1920 by 1080 slides fit the canvas without losing visual edit coordinates',async({page})=>{
+ await page.goto('/');await page.locator('#projectFile').setInputFiles({name:'large.html',mimeType:'text/html',buffer:Buffer.from('<style>body{margin:0}.slide{position:relative;width:1920px;height:1080px;background:beige}</style><section class="slide"><h1 style="position:absolute;left:150px;top:150px;width:600px;height:100px;margin:0">큰 슬라이드</h1></section>')});
+ const f=page.frameLocator('#canvas');const bounds=await f.locator('.slide').evaluate(e=>e.getBoundingClientRect().toJSON());expect(Math.round(bounds.width)).toBe(1280);expect(Math.round(bounds.height)).toBe(720);
+ await f.locator('h1').click();await page.locator('#propX').fill('200');await page.locator('#propX').press('Enter');expect(Math.round(await f.locator('h1').evaluate(e=>e.getBoundingClientRect().x))).toBe(200);
+ await page.locator('#propW').fill('500');await page.locator('#propW').press('Enter');expect(Math.round(await f.locator('h1').evaluate(e=>e.getBoundingClientRect().width))).toBe(500);
+});

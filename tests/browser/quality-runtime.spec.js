@@ -39,3 +39,12 @@ test('document load handlers remain inactive during editing and survive export',
  const promise=page.waitForEvent('download');await page.locator('#exportBtn').click();const dl=await promise;let html='';for await(const c of await dl.createReadStream())html+=c;
  const preview=await context.newPage();await preview.setContent(html);await expect(preview.frameLocator('#deck iframe').locator('body')).toHaveAttribute('data-loaded','yes');
 });
+test('script-only HTML can be wrapped as a single movable opaque page',async({page})=>{
+ await page.goto('/');await page.locator('#projectFile').setInputFiles({name:'app.html',mimeType:'text/html',buffer:Buffer.from('<div id="app"></div><script>document.getElementById("app").innerHTML="<h1>동적 페이지</h1>"</script>')});
+ await page.locator('#opaqueBtn').click();
+ await expect(page.locator('.runtime-object')).toHaveCount(1);
+ await expect(page.frameLocator('.runtime-object iframe').frameLocator('iframe').locator('h1')).toHaveText('동적 페이지');
+ await page.locator('#layers button').first().click();await page.locator('#propX').fill('40');await page.locator('#propX').press('Enter');
+ await expect(page.locator('.runtime-object')).toHaveCSS('left','40px');await page.locator('#undoBtn').click();await page.locator('#undoBtn').click();
+ await expect(page.frameLocator('#canvas').locator('#app')).toHaveCount(1);
+});
