@@ -1,4 +1,4 @@
-import {analyzeScript,findTextBinding,applyTextEdits} from './runtime-source.js';
+import {analyzeScript,findTextBinding,findTextBindings,applyTextEdits} from './runtime-source.js';
 
 const parse=html=>new DOMParser().parseFromString(html,'text/html');
 const serialize=d=>'<!doctype html>\n'+d.documentElement.outerHTML;
@@ -46,18 +46,8 @@ function captureBridge(channel){
  run();
 }
 
-export async function importRuntimeHTML(source,name,{onProgress=()=>{},signal}={}){
- if(/^\s*\{/.test(source))return null;
- const d=parse(source);if(d.getElementById('slide-room-project'))return null;
- let model,scriptIndex=-1;const scripts=[...d.querySelectorAll('script')];
- for(let i=0;i<scripts.length;i++){
-  if(scripts[i].src||scripts[i].type==='module'||!scripts[i].textContent.includes('SLIDES'))continue;
-  try{const candidate=analyzeScript(scripts[i].textContent);if(candidate){model=candidate;scriptIndex=i;break;}}catch{}
- }
- if(!model)return null;
- // The first adapter deliberately requires verified navigation semantics.
- if(!d.querySelector('#root:empty')||!model.source.includes('aria-label')||!model.source.includes('stage'))throw Error('슬라이드 정의는 찾았지만 페이지 이동 방식은 아직 지원하지 않습니다. 원본은 변경하지 않았습니다.');
- const channel=uid(),frame=document.createElement('iframe'),pages=[],bindings={};
+async function capturePages(d,model,onProgress,signal){
+ const channel=uid(),frame=document.createElement('iframe'),pages=[];
  frame.setAttribute('sandbox','allow-scripts');frame.title='원본 슬라이드 분석';frame.style.cssText='position:fixed;left:-20000px;top:0;width:1280px;height:720px;border:0;';
  const bridge=d.createElement('script');bridge.textContent='('+captureBridge.toString()+')('+JSON.stringify(channel)+');';d.body.append(bridge);
  await new Promise((resolve,reject)=>{
@@ -71,24 +61,7 @@ export async function importRuntimeHTML(source,name,{onProgress=()=>{},signal}={
    if(m.type==='error')return fail(Error(m.message));
    if(m.type==='page'){
     if(m.index!==pages.length||m.id!==model.slides[m.index]?.id||typeof m.html!=='string')return fail(Error('페이지 순서 검증에 실패했습니다.'));
-    const page=parse(m.html),texts=[],walker=page.createTreeWalker(page.body,NodeFilter.SHOW_TEXT);
-    for(const block of page.querySelectorAll('pre')){
-     const binding=findTextBinding(model,m.index,block.textContent.trim());if(!binding)continue;
-     const bindingId='s'+binding.start;bindings[bindingId]={...binding,displayText:block.textContent,slideIndex:m.index};block.dataset.srSource=bindingId;block.dataset.kind='text';
-    }
-    while(walker.nextNode()){const n=walker.currentNode;if(n.nodeValue.trim()&&!n.parentElement.closest('script,style,svg,button,.pageno,.brand,[data-sr-source]'))texts.push(n);}
-    let editable=page.querySelectorAll('[data-sr-source]').length;
-    for(const node of texts){
-     const text=node.nodeValue,binding=findTextBinding(model,m.index,text.trim());if(!binding)continue;
-     const bindingId='s'+binding.start;bindings[bindingId]={...binding,displayText:text,slideIndex:m.index};
-     const parent=node.parentElement;
-     // Keep original element semantics where possible; isolate mixed inline runs only in the editor snapshot.
-     const el=parent.childNodes.length===1?parent:page.createElement('sr-text');
-     if(el!==parent){node.replaceWith(el);el.append(node);}
-     el.dataset.srSource=bindingId;el.dataset.kind='text';editable++;
-    }
-    const title=page.querySelector('h1,h2,h3')?.textContent||`슬라이드 ${m.index+1}`;
-    pages.push({id:uid(),name:title.slice(0,45),html:serialize(page),runtimePage:m.index,editableTexts:editable});
+    pages.push(m.html);
     onProgress({current:pages.length,total:model.slides.length});arm();
    }
    if(m.type==='done'){
@@ -97,6 +70,67 @@ export async function importRuntimeHTML(source,name,{onProgress=()=>{},signal}={
    }
   };
   window.addEventListener('message',receive);signal?.addEventListener('abort',abort,{once:true});arm();document.body.append(frame);frame.srcdoc=serialize(d);if(signal?.aborted)abort();
+ });
+ return pages;
+}
+
+const textNodes=page=>{
+ const nodes=[],walker=page.createTreeWalker(page.body,NodeFilter.SHOW_TEXT);
+ while(walker.nextNode()){const n=walker.currentNode;if(n.nodeValue.trim()&&!n.parentElement.closest('script,style,svg,button,.pageno,.brand,[data-sr-source]'))nodes.push(n);}
+ return nodes;
+};
+const nodePath=node=>{const path=[];while(node.parentNode&&node.parentNode.nodeType!==9){path.unshift([...node.parentNode.childNodes].indexOf(node));node=node.parentNode;}return path;};
+const atPath=(doc,path)=>path.reduce((node,i)=>node?.childNodes[i],doc.documentElement);
+const elementPath=el=>{const path=[];while(el&&!el.matches('.stage')){path.unshift(':nth-child('+([...el.parentElement.children].indexOf(el)+1)+')');el=el.parentElement;}return path.join('>');};
+
+export async function importRuntimeHTML(source,name,{onProgress=()=>{},signal}={}){
+ if(/^\s*\{/.test(source))return null;
+ const d=parse(source);if(d.getElementById('slide-room-project'))return null;
+ let model,scriptIndex=-1;const scripts=[...d.querySelectorAll('script')];
+ for(let i=0;i<scripts.length;i++){
+  if(scripts[i].src||scripts[i].type==='module'||!scripts[i].textContent.includes('SLIDES'))continue;
+  try{const candidate=analyzeScript(scripts[i].textContent);if(candidate){model=candidate;scriptIndex=i;break;}}catch{}
+ }
+ if(!model)return null;
+ if(!d.querySelector('#root:empty')||!model.source.includes('aria-label')||!model.source.includes('stage'))throw Error('슬라이드 정의는 찾았지만 페이지 이동 방식은 아직 지원하지 않습니다. 원본은 변경하지 않았습니다.');
+ const rawPages=await capturePages(d,model,onProgress,signal),documents=rawPages.map(parse),bindings={},candidates=new Map(),verified=new Map();
+ // Resolve repeated words by running an isolated, marked copy. DOM/source order is not assumed.
+ documents.forEach((page,index)=>{for(const node of textNodes(page)){
+  const matches=findTextBindings(model,index,node.nodeValue.trim());
+  if(matches.length>1)for(const b of matches)candidates.set(b.start,{...b,slideIndex:index});
+ }});
+ if(candidates.size){
+  const marker='SR'+uid().replaceAll('-','')+'_',probe=parse(source),edits=[...candidates.values()].map(b=>({...b,text:marker+b.start}));
+  probe.querySelectorAll('script')[scriptIndex].textContent=applyTextEdits(model.source,edits);
+  const marked=await capturePages(probe,model,p=>onProgress({...p,phase:'text-map'}),signal);
+  marked.forEach((html,index)=>{
+   const page=parse(html),hits=new Map();
+   for(const n of textNodes(page)){
+    const value=n.nodeValue.trim();if(!value.startsWith(marker))continue;
+    const start=Number(value.slice(marker.length)),binding=candidates.get(start);if(!binding||binding.slideIndex!==index)continue;
+    const original=atPath(documents[index],nodePath(n));
+    if(!original||original.nodeType!==3||original.nodeValue.trim()!==binding.text||original.parentElement.tagName!==n.parentElement.tagName)continue;
+    const all=hits.get(start)||[];all.push(original);hits.set(start,all);
+   }
+   for(const [start,nodes]of hits)if(nodes.length===1)verified.set(nodes[0],candidates.get(start));
+  });
+ }
+ const pages=documents.map((page,index)=>{
+  page.body.dataset.srRuntimeSnapshot='';
+  for(const block of page.querySelectorAll('pre')){
+   const binding=findTextBinding(model,index,block.textContent.trim());if(!binding)continue;
+   const id='s'+binding.start;bindings[id]={...binding,displayText:block.textContent,slideIndex:index,path:elementPath(block)};block.dataset.srSource=id;block.dataset.kind='text';
+  }
+  const nodes=textNodes(page),paths=new Map(nodes.map(n=>[n,elementPath(n.parentElement)]));
+  for(const node of nodes){
+   const text=node.nodeValue,binding=verified.get(node)||findTextBinding(model,index,text.trim());if(!binding)continue;
+   const id='s'+binding.start;bindings[id]={...binding,displayText:text,slideIndex:index,path:paths.get(node)};
+   const parent=node.parentElement,el=parent.childNodes.length===1?parent:page.createElement('sr-text');
+   if(el!==parent){node.replaceWith(el);el.append(node);}
+   el.dataset.srSource=id;el.dataset.kind='text';
+  }
+  const title=page.querySelector('h1,h2,h3')?.textContent||`슬라이드 ${index+1}`;
+  return {id:uid(),name:title.slice(0,45),html:serialize(page),runtimePage:index,editableTexts:page.querySelectorAll('[data-sr-source]').length};
  });
  return {version:1,title:name.replace(/\.(html?|json)$/i,''),slides:pages,runtime:{version:1,kind:'react-slides-source',source,scriptIndex,bindings,edits:{},geometry:{}}};
 }
@@ -129,8 +163,12 @@ export function exportRuntimeHTML(project,{embed=true}={}){
    return p+':'+v+'!important';
   }).join(';');
   return '.stage[aria-label^="'+(g.page+1)+' /"]>'+g.path+'{'+styles+'}';
- }).join('\n');
- if(rules){const style=d.createElement('style');style.dataset.srRuntimeGeometry='';style.textContent=rules;d.head.append(style);}
+ });
+ for(const [id,text]of Object.entries(runtime.edits))if(text.includes('\n')){
+  const b=runtime.bindings[id];
+  if(/^:nth-child\(\d+\)(>:nth-child\(\d+\))*$/.test(b.path))rules.push('.stage[aria-label^="'+(b.slideIndex+1)+' /"]>'+b.path+'{white-space:pre-wrap!important}');
+ }
+ if(rules.length){const style=d.createElement('style');style.dataset.srRuntimeGeometry='';style.textContent=rules.join('\n');d.head.append(style);}
  if(embed){const data=d.createElement('script');data.id='slide-room-project';data.type='application/json';data.textContent=JSON.stringify(project).replaceAll('<','\\u003c');d.body.append(data);}
  return serialize(d);
 }

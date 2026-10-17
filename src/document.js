@@ -54,6 +54,10 @@ export function importHTML(html,name='새 강의',selector='') {
 }
 export function editorHTML(html) {
  const d=parse(html);
+ if(d.body.hasAttribute('data-sr-runtime-snapshot'))for(const animation of d.querySelectorAll('svg animate,svg animateMotion,svg animateTransform,svg set')){
+  if(animation.localName==='animateMotion')animation.parentElement.style.visibility='hidden';
+  animation.remove();
+ }
  d.querySelectorAll('script,base,meta[http-equiv],object,embed').forEach(el=>{
   if(['OBJECT','EMBED'].includes(el.tagName)){const p=d.createElement('div');p.style.cssText=el.getAttribute('style')||'width:320px;height:180px;background:#ddd';p.textContent='외부 미디어 · 미리보기에서 확인';p.dataset.srId=el.dataset.srId;el.replaceWith(p);}else el.remove();
  });
@@ -65,6 +69,7 @@ export function editorHTML(html) {
  for(const el of d.querySelectorAll('canvas')){el.style.display='block';if(!el.style.width)el.style.width=(el.getAttribute('width')||300)+'px';if(!el.style.height)el.style.height=(el.getAttribute('height')||150)+'px';}
  const csp=d.createElement('meta');csp.httpEquiv='Content-Security-Policy';csp.content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";d.head.prepend(csp);
  const style=d.createElement('style');style.dataset.editorOnly='';style.textContent='html{scrollbar-width:none}body{overflow:hidden!important}*{animation:none!important;transition:none!important;caret-color:#5364e8}[contenteditable=true]{outline:2px solid #6370ef!important;cursor:text!important} [data-sr-id]{cursor:grab!important;user-select:none}[contenteditable=true],[contenteditable=true] *{cursor:text!important;user-select:text!important}html[data-sr-dragging] *{cursor:grabbing!important;user-select:none!important}html[data-sr-dragging=resize] *{cursor:nwse-resize!important}';d.head.append(style);
+ style.textContent+='body[data-sr-runtime-snapshot] [data-sr-id]{cursor:default!important}body[data-sr-runtime-snapshot] [data-sr-geometry],body[data-sr-runtime-snapshot] [data-sr-geometry] *{cursor:grab!important}body[data-sr-runtime-snapshot] [data-sr-source],body[data-sr-runtime-snapshot] [data-sr-source] *{cursor:text!important}html[data-sr-dragging] body[data-sr-runtime-snapshot] *{cursor:grabbing!important}html[data-sr-dragging=resize] body[data-sr-runtime-snapshot] *{cursor:nwse-resize!important}';
  return serialize(d);
 }
 export function blankSlide(name='빈 슬라이드') {

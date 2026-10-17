@@ -8,6 +8,6 @@ test('hosted bundle includes editor modules without server or local workspace da
  const out=await mkdtemp(path.join(os.tmpdir(),'slide-room-static-'));
  await buildStatic(out);
  const html=await readFile(path.join(out,'index.html'),'utf8');assert.match(html,/app\.js/);
- for(const file of ['app.js','style.css','src/document.js','src/import-adapters.js','src/core.js','src/media.js','src/tables.js','src/assets.js','src/audit.js'])assert.ok((await readFile(path.join(out,file))).length);
+ for(const file of ['app.js','style.css','src/document.js','src/import-adapters.js','src/runtime-import.js','src/runtime-source.js','src/vendor/acorn.js','src/vendor/ACORN-LICENSE','src/core.js','src/media.js','src/tables.js','src/assets.js','src/audit.js'])assert.ok((await readFile(path.join(out,file))).length);
  const entries=await readdir(out);assert.ok(!entries.includes('server.mjs'));assert.ok(!entries.includes('.local'));assert.ok(!entries.includes('node_modules'));
 });

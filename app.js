@@ -1,10 +1,15 @@
 import {History,clone} from './src/core.js';
 import {uid,parse,serialize,markElements,importHTML,editorHTML,blankSlide,initialProject,exportHTML} from './src/document.js';
 import {importRuntimeHTML,captureRuntimeEdits,captureRuntimeGeometry} from './src/runtime-import.js';
+import {setup as setupMedia} from './src/media.js';
+import {setup as setupTables} from './src/tables.js';
+import {setup as setupAssets} from './src/assets.js';
+import {setup as setupAudit} from './src/audit.js';
 const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
 let project=initialProject(),history=new History(project),index=0,selected=null,scale=1,zoom=1,editing=null,loadVersion=0;
 let originalInput='',dirty=false,runtimeObjects=[],runtimeInteractive=false;
+let editingBefore='';
 $('#previewBtn').insertAdjacentHTML('beforebegin','<button id="runtimeModeBtn" hidden title="애니메이션 내부는 수정하지 않고 버튼과 재생을 조작합니다">애니메이션 실행</button>');
 $('#runtimeModeBtn').onclick=()=>{finishEdit();runtimeInteractive=!runtimeInteractive;$('#stage').classList.toggle('runtime-interactive',runtimeInteractive);$('#runtimeModeBtn').textContent=runtimeInteractive?'편집으로 돌아가기':'애니메이션 실행';updateBox();};
 $('#stage').innerHTML='<iframe id="canvas" title="슬라이드 편집 화면" sandbox="allow-same-origin"></iframe><div id="selectionBox" hidden><button id="resizeHandle" aria-label="크기 조절"></button><button id="objectBadge" aria-label="선택한 오브젝트 이동" title="드래그하여 오브젝트 이동"></button></div>';
@@ -149,14 +154,14 @@ function bindDocument(){
   e.preventDefault();e.target.setPointerCapture?.(e.pointerId);
   startMove(e,el,false);
  });
- d.addEventListener('dblclick',e=>{if(editing?.contains(e.target))return;e.preventDefault();const el=e.target.closest('td,th')||targetAt(e);if(isText(el))beginEdit(el,{x:e.clientX,y:e.clientY});else if(el?.tagName==='IMG'){$('#imageFile').dataset.replace='true';$('#imageFile').click();}});
+ d.addEventListener('dblclick',e=>{if(editing?.contains(e.target))return;e.preventDefault();const el=project.runtime?targetAt(e):e.target.closest('td,th')||targetAt(e);if(isText(el))beginEdit(el,{x:e.clientX,y:e.clientY});else if(el?.tagName==='IMG'){$('#imageFile').dataset.replace='true';$('#imageFile').click();}});
  d.addEventListener('keydown',keyboard);
  d.addEventListener('paste',e=>{if(!editing)return;e.preventDefault();d.execCommand('insertText',false,e.clipboardData.getData('text/plain'));});
  new ResizeObserver(updateBox).observe(d.body);
 }
 function beginEdit(el,point){
  if(project.runtime&&!isText(el))return;
- finishEdit();select(el);editing=el;el.contentEditable='true';el.focus({preventScroll:true});$('#selectionBox').hidden=true;
+ finishEdit();select(el);editing=el;editingBefore=el.innerHTML;el.contentEditable='true';el.focus({preventScroll:true});$('#selectionBox').hidden=true;
  updateEditMode();
  if(point){
   const d=el.ownerDocument;let range;
@@ -168,7 +173,7 @@ function beginEdit(el,point){
  el.addEventListener('blur',()=>{if(editing===el)finishEdit();},{once:true});
 }
 function updateEditMode(){$('#finishTextBtn').hidden=!editing;$('#editTextBtn').hidden=!!editing;$('#interactionHint').textContent=editing?'글자 편집 중 · Esc 또는 편집 완료를 누르면 이동할 수 있습니다.':'손바닥 커서로 드래그 · 더블클릭으로 글자 편집';}
-function finishEdit(){if(!editing)return;editing.removeAttribute('contenteditable');editing=null;updateEditMode();commit();updateBox();}
+function finishEdit(){if(!editing)return;if(project.runtime&&editing.innerHTML!==editingBefore){const text=editing.innerText;editing.textContent=text;editing.style.whiteSpace='pre-wrap';}editing.removeAttribute('contenteditable');editing=null;updateEditMode();commit();updateBox();}
 $('#editTextBtn').onclick=()=>{if(isText(selected))beginEdit(selected);};
 // Keep focus in the text until the explicit finish action runs.
 $('#finishTextBtn').onpointerdown=e=>e.preventDefault();$('#finishTextBtn').onclick=finishEdit;
@@ -256,7 +261,7 @@ $('#projectFile').onchange=async e=>{
  try{
   const file=e.target.files[0];if(!file)return;finishEdit();originalInput=await file.text();$('#openBtn').disabled=true;
   toast('원본 파일을 분석하고 있습니다…');
-  const dynamic=await importRuntimeHTML(originalInput,file.name,{onProgress:p=>toast(`원본 페이지 확인 중 · ${p.current} / ${p.total}`)});
+  const dynamic=await importRuntimeHTML(originalInput,file.name,{onProgress:p=>toast(`${p.phase==='text-map'?'반복 글자의 원본 위치 확인 중':'원본 페이지 확인 중'} · ${p.current} / ${p.total}`)});
   const next=dynamic||importHTML(originalInput,file.name);
   if(dynamic)for(const s of next.slides){const d=parse(s.html);markElements(d);s.html=serialize(d);}
   project=next;history=new History(project);index=0;await render();saveLocal();toast(`${project.slides.length}개 슬라이드를 불러왔습니다.`);$('#importNotice').hidden=false;
@@ -279,11 +284,8 @@ let saveSequence=0;
 async function saveLocal(){const sequence=++saveSequence;$('#saveState').textContent='저장 중…';try{const snapshot=clone(project),db=await database();await new Promise((resolve,reject)=>{const tx=db.transaction('projects','readwrite');tx.objectStore('projects').put(snapshot,'current');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});if(sequence===saveSequence){$('#saveState').textContent='자동 저장됨';dirty=false;}}catch(err){$('#saveState').textContent='저장 실패 · 파일로 저장하세요';toast('자동 저장 실패: 저장 버튼으로 프로젝트를 내려받으세요.');}}
 async function restore(){try{const db=await database(),p=await new Promise((resolve,reject)=>{const r=db.transaction('projects').objectStore('projects').get('current');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});if(p?.version===1&&p.slides?.length){project=p;history=new History(p);}}catch{toast('자동 저장소를 열 수 없습니다. 파일 저장을 이용하세요.');}await render();}
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
-await restore();
 // Feature modules share the selection and commit boundary, not duplicate editor state.
 export const editor={get document(){return doc();},get selected(){return selected;},get project(){return project;},get index(){return index;},select,commit,toast,finishEdit,beginEdit,render,download,add};
-(await import('./src/media.js')).setup(editor);
-(await import('./src/tables.js')).setup(editor);
-(await import('./src/assets.js')).setup(editor);
-(await import('./src/audit.js')).setup(editor);
+setupMedia(editor);setupTables(editor);setupAssets(editor);setupAudit(editor);
+editor.ready=restore();await editor.ready;
 updateRuntimePermissions();
