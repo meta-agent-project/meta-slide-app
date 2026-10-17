@@ -1,3 +1,4 @@
+import {prepareImport,normalizeReveal} from './import-adapters.js';
 const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;').replaceAll('>','&gt;');
 export const uid=()=>crypto.randomUUID();
 export const parse=html=>new DOMParser().parseFromString(html,'text/html');
@@ -23,6 +24,7 @@ export function importHTML(html,name='새 강의',selector='') {
   p.slides.forEach(s=>{s.id ||=uid();const d=parse(s.html);markElements(d);s.html=serialize(d);});p.title=String(p.title||'새 강의');return p;
  }
  doc.querySelectorAll('base,meta[http-equiv]').forEach(e=>e.remove());
+ const adapter=prepareImport(doc);selector||=adapter.selector||'';
  markElements(doc);
  let roots=[];
  if(selector) roots=[...doc.querySelectorAll(selector)];
@@ -43,6 +45,7 @@ export function importHTML(html,name='새 강의',selector='') {
    active.classList.add('active');
    // Existing deck containers may translate to another page. A single page is shown at its own origin.
    const st=d.createElement('style');st.setAttribute('data-sr-page-style','');st.textContent='html,body{margin:0!important;overflow:hidden!important} [data-sr-page]{margin:0!important;box-sizing:border-box}';d.head.append(st);
+   if(adapter.kind==='reveal')normalizeReveal(d,html);
   }
   return {id:uid(),name:root.querySelector('h1,h2,h3')?.textContent?.slice(0,45)||`슬라이드 ${i+1}`,html:serialize(d)};
  });
@@ -60,7 +63,7 @@ export function editorHTML(html) {
  // Explicit dimensions keep its selectable footprint; a separate opaque iframe renders it live.
  for(const el of d.querySelectorAll('canvas')){el.style.display='block';if(!el.style.width)el.style.width=(el.getAttribute('width')||300)+'px';if(!el.style.height)el.style.height=(el.getAttribute('height')||150)+'px';}
  const csp=d.createElement('meta');csp.httpEquiv='Content-Security-Policy';csp.content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";d.head.prepend(csp);
- const style=d.createElement('style');style.dataset.editorOnly='';style.textContent='html{scrollbar-width:none}body{overflow:hidden!important}*{animation-play-state:paused!important;caret-color:#5364e8}[contenteditable=true]{outline:2px solid #6370ef!important;cursor:text!important} [data-sr-id]{cursor:grab!important;user-select:none}[contenteditable=true],[contenteditable=true] *{cursor:text!important;user-select:text!important}html[data-sr-dragging] *{cursor:grabbing!important;user-select:none!important}html[data-sr-dragging=resize] *{cursor:nwse-resize!important}';d.head.append(style);
+ const style=d.createElement('style');style.dataset.editorOnly='';style.textContent='html{scrollbar-width:none}body{overflow:hidden!important}*{animation:none!important;transition:none!important;caret-color:#5364e8}[contenteditable=true]{outline:2px solid #6370ef!important;cursor:text!important} [data-sr-id]{cursor:grab!important;user-select:none}[contenteditable=true],[contenteditable=true] *{cursor:text!important;user-select:text!important}html[data-sr-dragging] *{cursor:grabbing!important;user-select:none!important}html[data-sr-dragging=resize] *{cursor:nwse-resize!important}';d.head.append(style);
  return serialize(d);
 }
 export function blankSlide(name='빈 슬라이드') {

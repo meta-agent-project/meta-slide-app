@@ -19,6 +19,7 @@ export function setup(editor) {
  $('#replaceImage').onclick=()=>{$('#imageFile').dataset.replace='true';$('#imageFile').click();};
  document.addEventListener('object-selected',({detail:el})=>{
   $('#imageProps').hidden=el?.tagName!=='IMG';$('#videoProps').hidden=!['VIDEO','IFRAME','CANVAS'].includes(el?.tagName);
+  $('#replaceVideo').hidden=el?.tagName!=='VIDEO';$('#videoProps p').textContent=el?.tagName==='VIDEO'?'미리보기에서 재생합니다. 리모션은 완성한 MP4/WebM으로 넣을 수 있습니다.':'내부 편집은 잠겨 있습니다. 전체를 드래그해 이동하거나 애니메이션 실행에서 동작을 조작하세요.';
   if(el?.tagName==='IMG'){const cs=editor.document.defaultView.getComputedStyle(el);$('#cropMode').value=cs.objectFit;const p=cs.objectPosition.split(' ');$('#cropX').value=parseFloat(p[0]);$('#cropY').value=parseFloat(p[1]);$('#imageAlt').value=el.alt;}
  });
  $('#cropMode').onchange=e=>{if(editor.selected?.tagName==='IMG'){editor.selected.style.objectFit=e.target.value;editor.commit();}};

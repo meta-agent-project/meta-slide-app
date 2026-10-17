@@ -6,6 +6,9 @@
 .runtime-object{position:absolute;overflow:hidden;pointer-events:none}.runtime-object iframe{pointer-events:none}#auditDialog{width:670px;height:auto;max-height:85vh;padding:28px;background:white}#auditDialog p{color:#84909f;font-size:12px}#auditList{max-height:55vh;overflow:auto;margin:20px 0}#auditList button{display:block;width:100%;text-align:left;margin:7px 0;font-size:12px;line-height:1.7}header #projectName{width:160px}@media(max-width:1360px){#saveState{display:none}header{padding:0 14px}.header-actions button{padding:8px 9px}}
 #opaqueBtn{display:block;width:100%;font-size:11px;margin-top:20px;color:#737e90}
 /* Keep editing controls reachable inside a narrow desktop app panel. */
+.runtime-object{pointer-events:auto;cursor:grab}.runtime-interactive .runtime-object{cursor:auto}.object-dragging .runtime-object{cursor:grabbing}
+.stage-loading::after{content:'슬라이드 불러오는 중…';position:absolute;inset:0;z-index:10000;display:grid;place-items:center;background:#f8f9fbe8;color:#4d5ccd;font-size:24px;cursor:wait}.stage-loading #canvas{pointer-events:none}
+.runtime-interactive .runtime-object,.runtime-interactive .runtime-object iframe{pointer-events:auto}.runtime-interactive #canvas{pointer-events:none}#runtimeModeBtn{border-color:#6370ef;color:#4d5ccd}
 #objectBadge,#resizeHandle{transform:scale(var(--ui-scale,1))}#objectBadge{transform-origin:left bottom}#resizeHandle{transform-origin:center}
 body{min-width:760px;height:100vh;display:flex;flex-direction:column}header,.toolbar{flex-shrink:0}main{flex:1;min-height:0;height:auto;grid-template-columns:190px minmax(0,1fr) 250px}.workspace,.properties,.slides-panel{min-width:0}
 header{height:auto;min-height:76px;flex-wrap:wrap;padding-top:10px;padding-bottom:10px}.header-actions{flex-wrap:wrap;justify-content:flex-end}.toolbar{height:auto;min-height:63px;flex-wrap:wrap;padding-top:8px;padding-bottom:8px}

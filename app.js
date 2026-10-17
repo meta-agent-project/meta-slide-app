@@ -3,7 +3,9 @@ import {uid,parse,serialize,markElements,importHTML,editorHTML,blankSlide,initia
 const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
 let project=initialProject(),history=new History(project),index=0,selected=null,scale=1,zoom=1,editing=null,loadVersion=0;
-let originalInput='',dirty=false,runtimeObjects=[];
+let originalInput='',dirty=false,runtimeObjects=[],runtimeInteractive=false;
+$('#previewBtn').insertAdjacentHTML('beforebegin','<button id="runtimeModeBtn" hidden title="애니메이션 내부는 수정하지 않고 버튼과 재생을 조작합니다">애니메이션 실행</button>');
+$('#runtimeModeBtn').onclick=()=>{finishEdit();runtimeInteractive=!runtimeInteractive;$('#stage').classList.toggle('runtime-interactive',runtimeInteractive);$('#runtimeModeBtn').textContent=runtimeInteractive?'편집으로 돌아가기':'애니메이션 실행';updateBox();};
 $('#stage').innerHTML='<iframe id="canvas" title="슬라이드 편집 화면" sandbox="allow-same-origin"></iframe><div id="selectionBox" hidden><button id="resizeHandle" aria-label="크기 조절"></button><button id="objectBadge" aria-label="선택한 오브젝트 이동" title="드래그하여 오브젝트 이동"></button></div>';
 $('.canvas-help').innerHTML='<span id="interactionHint" role="status">손바닥 커서로 드래그 · 더블클릭으로 글자 편집</span><button id="editTextBtn" disabled>글자 편집</button><button id="finishTextBtn" hidden>편집 완료 · Esc</button>';
 const canvas=$('#canvas');
@@ -43,16 +45,18 @@ function takeSnapshot(){
 function commit({capture=true}={}){if(capture)takeSnapshot();history.push(project);dirty=true;updateHistory();renderSlides();renderLayers();syncRuntime();saveLocal();}
 function updateHistory(){$('#undoBtn').disabled=!history.canUndo;$('#redoBtn').disabled=!history.canRedo;}
 async function render(){
+ $('#stage').classList.add('stage-loading');
+ runtimeInteractive=false;$('#stage').classList.remove('runtime-interactive');$('#runtimeModeBtn').textContent='애니메이션 실행';
  const version=++loadVersion;selected=null;editing=null;$('#selectionBox').hidden=true;$('#projectName').value=project.title;renderSlides();updateHistory();
  await new Promise(resolve=>{canvas.onload=resolve;canvas.srcdoc=editorHTML(current().html);});
  if(version!==loadVersion)return;
- const pageRoot=doc().querySelector('[data-sr-page]');
+ const pageRoot=doc().querySelector('[data-sr-fit-page]')||doc().querySelector('[data-sr-page]');
  if(pageRoot&&doc().defaultView.getComputedStyle(pageRoot).display==='none')pageRoot.style.setProperty('display','block','important');
  if(pageRoot&&!pageRoot.hasAttribute('data-sr-fitted')){
   const r=getRect(pageRoot),ratio=r.width/r.height;
-  if(r.width>0&&r.height>0&&Math.abs(ratio-16/9)<.12){const factor=Math.min(1280/r.width,720/r.height);if(Math.abs(factor-1)>.01){doc().documentElement.style.zoom=String(factor);pageRoot.dataset.srFitted='';takeSnapshot();renderSlides();}}
+  if(r.width>0&&r.height>0&&(pageRoot.hasAttribute('data-sr-fit-page')||Math.abs(ratio-16/9)<.12)){const factor=Math.min(1280/r.width,720/r.height);if(Math.abs(factor-1)>.01){if(pageRoot.hasAttribute('data-sr-fit-page')){pageRoot.style.transform='scale('+factor+')';pageRoot.style.transformOrigin='top left';}else doc().documentElement.style.zoom=String(factor);pageRoot.dataset.srFitted='';takeSnapshot();renderSlides();}}
  }
- bindDocument();fit();select(null);renderLayers();syncRuntime();
+ bindDocument();fit();select(null);renderLayers();syncRuntime();$('#stage').classList.remove('stage-loading');
  document.dispatchEvent(new Event('slide-ready'));
 }
 const slidePreviews=new Map();
@@ -90,7 +94,7 @@ function select(el){
  const target=el||doc().body,cs=doc().defaultView.getComputedStyle(target);const rgb=(isText(el)?cs.color:cs.backgroundColor).match(/\d+/g);const color=rgb?'#'+rgb.slice(0,3).map(n=>Number(n).toString(16).padStart(2,'0')).join(''):'#ffffff';$('#colorInput').value=color;$('#colorHex').value=color.toUpperCase();$('#colorLabel').textContent=isText(el)?'글자색':'배경색';
  updateBox();document.dispatchEvent(new CustomEvent('object-selected',{detail:el}));
 }
-function updateBox(){$('#stage').style.setProperty('--ui-scale',String(1/scale));updateRuntimePositions();const box=$('#selectionBox');if(editing||!selected||!selected.isConnected){box.hidden=true;return;}const r=getRect(selected);box.hidden=false;Object.assign(box.style,{left:r.x+'px',top:r.y+'px',width:r.width+'px',height:r.height+'px'});$('#objectBadge').textContent=nodeName(selected)+' · 이동';const nearTop=r.y*scale<40;$('#objectBadge').style.top=nearTop?'2px':'';$('#objectBadge').style.transformOrigin=nearTop?'left top':'left bottom';}
+function updateBox(){$('#stage').style.setProperty('--ui-scale',String(1/scale));updateRuntimePositions();const box=$('#selectionBox');if(runtimeInteractive||editing||!selected||!selected.isConnected){box.hidden=true;return;}const r=getRect(selected);box.hidden=false;Object.assign(box.style,{left:r.x+'px',top:r.y+'px',width:r.width+'px',height:r.height+'px'});$('#objectBadge').textContent=nodeName(selected)+' · 이동';const nearTop=r.y*scale<40;$('#objectBadge').style.top=nearTop?'2px':'';$('#objectBadge').style.transformOrigin=nearTop?'left top':'left bottom';}
 function updateRuntimePositions(){for(const {el,wrapper,frame,rect}of runtimeObjects){if(!el.isConnected)continue;const r=getRect(el);Object.assign(wrapper.style,{left:r.x+'px',top:r.y+'px',width:r.width+'px',height:r.height+'px'});frame.style.transform=`scale(${r.width/rect.width},${r.height/rect.height})`;}}
 function syncRuntime(){
  runtimeObjects.forEach(x=>x.wrapper.remove());runtimeObjects=[];if(!doc()?.body)return;
@@ -99,9 +103,16 @@ function syncRuntime(){
   if(source.parentElement.closest('canvas,iframe,object,embed,[data-sr-opaque]'))continue;
   const el=doc().querySelector(`[data-sr-id="${source.dataset.srId}"]`);if(!el)continue;const r=getRect(el);if(!r.width||!r.height)continue;
   const wrapper=document.createElement('div');wrapper.className='runtime-object';const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts');frame.title='동적 오브젝트 미리보기';
-  frame.srcdoc=current().html;frame.style.cssText=`position:absolute;left:${-r.x}px;top:${-r.y}px;width:1280px;height:720px;border:0;transform-origin:${r.x}px ${r.y}px;`;
-  wrapper.append(frame);$('#selectionBox').before(wrapper);runtimeObjects.push({el,wrapper,frame,rect:r});
- }updateRuntimePositions();
+  wrapper.onpointerdown=e=>{if(runtimeInteractive||e.button!==0)return;finishEdit();select(el);e.preventDefault();wrapper.setPointerCapture(e.pointerId);startMove(e,el,false);};
+  let rect=r;
+  if(source.tagName==='IFRAME'&&source.hasAttribute('srcdoc')){
+   // Render an embedded app directly: a second copy of the whole slide causes
+   // duplicate layout, font timing drift, and incorrect nested pointer coordinates.
+   rect={width:el.clientWidth||r.width,height:el.clientHeight||r.height};frame.srcdoc=source.getAttribute('srcdoc');
+   frame.style.cssText=`position:absolute;left:0;top:0;width:${rect.width}px;height:${rect.height}px;border:0;transform-origin:top left;`;
+  }else{frame.srcdoc=current().html;frame.style.cssText=`position:absolute;left:${-r.x}px;top:${-r.y}px;width:1280px;height:720px;border:0;transform-origin:${r.x}px ${r.y}px;`;}
+  wrapper.append(frame);$('#selectionBox').before(wrapper);runtimeObjects.push({el,wrapper,frame,rect});
+ }$('#runtimeModeBtn').hidden=!runtimeObjects.length;updateRuntimePositions();
 }
 function renderLayers(){
  const layer=$('#layers');layer.replaceChildren();if(!doc()?.body)return;

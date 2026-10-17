@@ -16,7 +16,7 @@ test('script-driven canvas has an isolated live object surface and remains movab
  await expect(page.locator('.runtime-object')).toHaveCount(1);
  const live=page.frameLocator('.runtime-object iframe');await expect(live.locator('body')).toHaveAttribute('data-rendered','yes');
  const pixel=await live.locator('canvas').evaluate(c=>[...c.getContext('2d').getImageData(1,1,1,1).data]);expect(pixel).toEqual([255,0,0,255]);
- await page.frameLocator('#canvas').locator('canvas').click();await page.locator('#propX').fill('240');await page.locator('#propX').press('Enter');
+ await page.locator('.runtime-object').click();await page.locator('#propX').fill('240');await page.locator('#propX').press('Enter');
  await expect(page.locator('.runtime-object')).toHaveCSS('left','240px');
 });
 test('uploaded video plays in preview and survives export',async({page})=>{
@@ -46,5 +46,5 @@ test('script-only HTML can be wrapped as a single movable opaque page',async({pa
  await expect(page.frameLocator('.runtime-object iframe').frameLocator('iframe').locator('h1')).toHaveText('동적 페이지');
  await page.locator('#layers button').first().click();await page.locator('#propX').fill('40');await page.locator('#propX').press('Enter');
  await expect(page.locator('.runtime-object')).toHaveCSS('left','40px');await page.locator('#undoBtn').click();await page.locator('#undoBtn').click();
- await expect(page.frameLocator('#canvas').locator('#app')).toHaveCount(1);
+ await expect(page.frameLocator('#canvas').locator('iframe[data-kind="animation"]')).toHaveCount(1);
 });
