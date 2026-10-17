@@ -55,6 +55,9 @@ export function editorHTML(html) {
  for(const el of d.querySelectorAll('*'))for(const a of [...el.attributes])if(/^on/i.test(a.name)||(/^(href|src|action|formaction)$/i.test(a.name)&&/^\s*javascript:/i.test(a.value)))el.removeAttribute(a.name);
  // Nested browsing contexts remain opaque and scriptless while editing.
  for(const el of d.querySelectorAll('iframe'))el.setAttribute('sandbox','');
+ // With scripting disabled, canvas is fallback content rather than a replaced element.
+ // Explicit dimensions keep its selectable footprint; a separate opaque iframe renders it live.
+ for(const el of d.querySelectorAll('canvas')){el.style.display='block';if(!el.style.width)el.style.width=(el.getAttribute('width')||300)+'px';if(!el.style.height)el.style.height=(el.getAttribute('height')||150)+'px';}
  const csp=d.createElement('meta');csp.httpEquiv='Content-Security-Policy';csp.content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";d.head.prepend(csp);
  const style=d.createElement('style');style.dataset.editorOnly='';style.textContent='html{scrollbar-width:none}body{overflow:hidden!important}*{animation-play-state:paused!important;caret-color:#5364e8}[contenteditable=true]{outline:2px solid #6370ef!important;cursor:text!important} a{cursor:default}';d.head.append(style);
  return serialize(d);
