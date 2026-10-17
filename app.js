@@ -29,8 +29,9 @@ function takeSnapshot(){
  const old=parse(current().html);
  for(const tag of ['html','body'])for(const attr of old.querySelector(tag).attributes)if(/^on/i.test(attr.name))d.querySelector(tag).setAttribute(attr.name,attr.value);
  old.querySelectorAll('script').forEach(s=>d.body.append(d.importNode(s,true)));
+ const priorElements=new Map([...old.querySelectorAll('[data-sr-id]')].map(el=>[el.dataset.srId,el]));
  for(const el of d.querySelectorAll('[data-sr-id]')){
-  const prior=old.querySelector(`[data-sr-id="${el.dataset.srId}"]`);
+  const prior=priorElements.get(el.dataset.srId);
   if(prior){for(const a of prior.attributes)if(/^on/i.test(a.name))el.setAttribute(a.name,a.value);
    if(['OBJECT','EMBED'].includes(prior.tagName)){const restored=d.importNode(prior,true);restored.style.cssText=el.style.cssText;el.replaceWith(restored);}
    if(el.tagName==='IFRAME'){if(prior.hasAttribute('sandbox'))el.setAttribute('sandbox',prior.getAttribute('sandbox'));else el.removeAttribute('sandbox');}
@@ -53,14 +54,23 @@ async function render(){
  bindDocument();fit();select(null);renderLayers();syncRuntime();
  document.dispatchEvent(new Event('slide-ready'));
 }
+const slidePreviews=new Map();
 function renderSlides(){
- const list=$('#slides');list.replaceChildren();
+ const list=$('#slides'),ids=new Set(project.slides.map(s=>s.id));
+ for(const [id,entry]of slidePreviews)if(!ids.has(id)){entry.item.remove();slidePreviews.delete(id);}
  project.slides.forEach((s,i)=>{
-  const item=document.createElement('button');item.className='slide-item'+(i===index?' active':'');item.title=s.name;item.setAttribute('aria-label',`슬라이드 ${i+1}: ${s.name}`);
-  const num=document.createElement('span');num.className='slide-number';num.textContent=String(i+1).padStart(2,'0');
-  const frame=document.createElement('div');frame.className='thumb-frame';
-  const preview=document.createElement('iframe');preview.className='thumb';preview.tabIndex=-1;preview.setAttribute('sandbox','');preview.srcdoc=editorHTML(s.html);preview.title=s.name;frame.append(preview);
-  item.append(num,frame);item.onclick=()=>{finishEdit();index=i;render();};list.append(item);
+  let entry=slidePreviews.get(s.id);
+  if(!entry){
+   const item=document.createElement('button'),num=document.createElement('span'),frame=document.createElement('div'),preview=document.createElement('iframe');
+   num.className='slide-number';frame.className='thumb-frame';preview.className='thumb';preview.tabIndex=-1;preview.loading='lazy';preview.setAttribute('sandbox','');
+   frame.append(preview);item.append(num,frame);entry={item,num,preview,html:null};slidePreviews.set(s.id,entry);
+  }
+  const {item,num,preview}=entry;
+  item.className='slide-item'+(i===index?' active':'');item.title=s.name;item.setAttribute('aria-label',`슬라이드 ${i+1}: ${s.name}`);num.textContent=String(i+1).padStart(2,'0');preview.title=s.name;
+  if(entry.html!==s.html){preview.srcdoc=editorHTML(s.html);entry.html=s.html;}
+  item.onclick=()=>{finishEdit();index=i;render();};
+  // Moving a connected iframe reloads it; leave unchanged positions untouched.
+  if(list.children[i]!==item)list.insertBefore(item,list.children[i]||null);
  });
  $('#slideCount').textContent=String(project.slides.length).padStart(2,'0');$('#slideLabel').textContent=`SLIDE ${String(index+1).padStart(2,'0')}`;
  $('#slideUp').disabled=index===0;$('#slideDown').disabled=index===project.slides.length-1;
