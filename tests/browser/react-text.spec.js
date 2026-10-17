@@ -4,6 +4,17 @@ const fixture='C:/Users/ssarm/Documents/Spec에서 Wiki까지.html';
 
 async function load(page){await page.goto('/');await page.locator('#projectFile').setInputFiles(fixture);await expect(page.locator('.slide-item')).toHaveCount(41,{timeout:120000});await expect(page.locator('#stage')).not.toHaveClass(/stage-loading/);}
 
+test('a delayed external font stylesheet does not block runtime page switching',async({page})=>{
+ test.skip(!existsSync(fixture));test.setTimeout(90000);await load(page);
+ let release;const gate=new Promise(resolve=>release=resolve);
+ await page.route('https://fonts.googleapis.com/**',async route=>{await gate;await route.abort();});
+ try{
+  await page.locator('.slide-item').nth(1).click();
+  await expect(page.locator('#stage')).not.toHaveClass(/stage-loading/,{timeout:4000});
+  await expect(page.frameLocator('#canvas').locator('h2')).toBeVisible();
+ }finally{release();}
+});
+
 test('actual 41-page React deck: source-bound text survives original runtime navigation and export',async({page})=>{
  test.skip(!existsSync(fixture),'User fixture unavailable');test.setTimeout(180000);
  const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/');

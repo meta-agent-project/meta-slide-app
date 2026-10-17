@@ -55,7 +55,17 @@ async function render(){
  $('#stage').classList.add('stage-loading');
  runtimeInteractive=false;$('#stage').classList.remove('runtime-interactive');$('#runtimeModeBtn').textContent='애니메이션 실행';
  const version=++loadVersion;selected=null;editing=null;$('#selectionBox').hidden=true;$('#projectName').value=project.title;renderSlides();updateHistory();
- await new Promise(resolve=>{canvas.onload=resolve;canvas.srcdoc=editorHTML(current().html);});
+ await new Promise(resolve=>{
+  // A stylesheet/image can hold iframe load open indefinitely after its DOM is ready.
+  // The token prevents an old document (or an earlier rapid click) satisfying this wait.
+  let timer;const done=()=>{clearInterval(timer);if(canvas.onload===done)canvas.onload=null;resolve();};
+  canvas.onload=done;canvas.srcdoc=editorHTML(current().html,String(version));
+  timer=setInterval(()=>{
+   if(version!==loadVersion)return done();
+   const d=canvas.contentDocument;
+   if(d?.querySelector('meta[name="slide-room-load"]')?.content===String(version)&&d.readyState!=='loading')done();
+  },25);
+ });
  if(version!==loadVersion)return;
  const pageRoot=doc().querySelector('[data-sr-fit-page]')||doc().querySelector('[data-sr-page]');
  if(pageRoot&&doc().defaultView.getComputedStyle(pageRoot).display==='none')pageRoot.style.setProperty('display','block','important');

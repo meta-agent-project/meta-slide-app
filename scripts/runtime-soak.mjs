@@ -16,12 +16,15 @@ if(!existsSync('C:/Users/ssarm/Documents/Spec에서 Wiki까지.html'))throw Erro
 if(existsSync(stateFile)){
  const previous=JSON.parse(readFileSync(stateFile,'utf8'));
  if(previous.status==='running')try{process.kill(previous.pid,0);throw Error('Another soak process is still running.');}catch(e){if(e.code!=='ESRCH')throw e;}
+ const archive=path.join(directory,`session-${previous.startedAt.replaceAll(':','-')}.json`);
+ writeFileSync(archive,JSON.stringify(previous,null,2));
+ state.previousSession=archive;
 }
 save();
 async function run(number){
  const started=Date.now(),log=path.join(directory,`run-${Date.now()}.log`);let output='';
  const specs=number%5===0?[]:['tests/browser/react-text.spec.js','tests/browser/runtime-failure.spec.js'];
- const args=[path.join(root,'node_modules','@playwright','test','cli.js'),'test',...specs,'--output',path.join(directory,'artifacts-'+number),'--reporter=line'];
+ const args=[path.join(root,'node_modules','@playwright','test','cli.js'),'test',...specs,'--output',path.join(directory,'artifacts-'+started),'--reporter=line'];
  const result=await new Promise(resolve=>{
   const child=spawn(process.execPath,args,{cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe']});
   child.stdout.on('data',d=>{output+=d;writeFileSync(log,output);});child.stderr.on('data',d=>{output+=d;writeFileSync(log,output);});

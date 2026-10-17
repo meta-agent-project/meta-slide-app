@@ -52,8 +52,9 @@ export function importHTML(html,name='새 강의',selector='') {
  });
  return {version:1,title:name.replace(/\.(html?|json)$/i,''),slides};
 }
-export function editorHTML(html) {
+export function editorHTML(html,loadToken='') {
  const d=parse(html);
+ if(loadToken){const marker=d.createElement('meta');marker.dataset.editorOnly='';marker.name='slide-room-load';marker.content=String(loadToken);d.head.prepend(marker);}
  if(d.body.hasAttribute('data-sr-runtime-snapshot'))for(const animation of d.querySelectorAll('svg animate,svg animateMotion,svg animateTransform,svg set')){
   if(animation.localName==='animateMotion')animation.parentElement.style.visibility='hidden';
   animation.remove();
