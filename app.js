@@ -23,6 +23,7 @@ function takeSnapshot(){
  const d=parse(serialize(doc()));
  d.querySelectorAll('[data-editor-only],meta[http-equiv="Content-Security-Policy"]').forEach(e=>e.remove());
  d.querySelectorAll('[contenteditable]').forEach(e=>e.removeAttribute('contenteditable'));
+ d.querySelectorAll('[data-cell-selected]').forEach(e=>e.removeAttribute('data-cell-selected'));
  const old=parse(current().html);
  old.querySelectorAll('script').forEach(s=>d.body.append(d.importNode(s,true)));
  for(const el of d.querySelectorAll('[data-sr-id]')){
@@ -163,5 +164,5 @@ window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.return
 await restore();
 // Feature modules share the selection and commit boundary, not duplicate editor state.
 export const editor={get document(){return doc();},get selected(){return selected;},get project(){return project;},get index(){return index;},select,commit,toast,finishEdit,beginEdit,render,download,add};
-await import('./src/media.js').catch(()=>{});
-await import('./src/tables.js').catch(()=>{});
+(await import('./src/media.js')).setup(editor);
+(await import('./src/tables.js')).setup(editor);

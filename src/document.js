@@ -10,6 +10,11 @@ export function markElements(doc) {
  }
 }
 export function importHTML(html,name='새 강의',selector='') {
+ if(/^\s*\{/.test(html)) {
+  const p=JSON.parse(html);
+  if(p.version!==1||!Array.isArray(p.slides)||!p.slides.length||p.slides.some(s=>typeof s.html!=='string'))throw Error('프로젝트 파일 형식이 올바르지 않습니다.');
+  p.slides.forEach(s=>s.id||=uid()); return p;
+ }
  const doc=parse(html), embedded=doc.getElementById('slide-room-project');
  if(embedded) {
   const p=JSON.parse(embedded.textContent);

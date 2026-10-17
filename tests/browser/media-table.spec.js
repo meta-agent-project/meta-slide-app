@@ -1,0 +1,44 @@
+import {test,expect} from '@playwright/test';
+test('image upload and crop survive export, reimport and local restoration',async({page})=>{
+ await page.goto('/');
+ const image='<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"><rect width="600" height="300" fill="coral"/></svg>';
+ await page.locator('#imageFile').setInputFiles({name:'picture.svg',mimeType:'image/svg+xml',buffer:Buffer.from(image)});
+ const frame=page.frameLocator('#canvas');
+ await expect(frame.locator('img')).toHaveCount(1);
+ await page.locator('#cropMode').selectOption('cover');
+ await page.locator('#cropX').fill('30');await page.locator('#cropX').dispatchEvent('change');
+ await expect(frame.locator('img')).toHaveCSS('object-fit','cover');
+ const downloadPromise=page.waitForEvent('download');await page.locator('#exportBtn').click();
+ const download=await downloadPromise;const stream=await download.createReadStream();let html='';for await(const chunk of stream)html+=chunk;
+ expect(html).toContain('data:image/svg+xml;base64,');expect(html).not.toContain('blob:');
+ await page.locator('#projectFile').setInputFiles({name:'export.html',mimeType:'text/html',buffer:Buffer.from(html)});
+ await expect(frame.locator('img')).toHaveCSS('object-position','30% 50%');
+ await expect(page.locator('#saveState')).toHaveText('자동 저장됨');await page.reload();
+ await expect(frame.locator('img')).toHaveCount(1);
+ const savedPromise=page.waitForEvent('download');await page.locator('#saveBtn').click();
+ const saved=await savedPromise;let json='';for await(const chunk of await saved.createReadStream())json+=chunk;
+ await page.locator('#projectFile').setInputFiles({name:'saved.slide.json',mimeType:'application/json',buffer:Buffer.from(json)});
+ await expect(frame.locator('img')).toHaveCount(1);
+});
+test('table edit, rectangle selection, merge split, row and column changes',async({page})=>{
+ await page.goto('/');await page.locator('#tableBtn').click();
+ const frame=page.frameLocator('#canvas');const cells=frame.locator('td,th');
+ await expect(cells).toHaveCount(9);
+ await cells.nth(0).dblclick();await frame.locator('[contenteditable=true]').fill('첫 셀');await page.locator('#selectionName').click();
+ await cells.nth(0).click();await cells.nth(4).click({modifiers:['Shift']});
+ await page.locator('#mergeCells').click();
+ await expect(frame.locator('[rowspan="2"][colspan="2"]')).toHaveText('첫 셀');
+ await page.locator('#splitCell').click();await expect(cells).toHaveCount(9);
+ await page.locator('#insertRow').click();await expect(frame.locator('tr')).toHaveCount(4);
+ await page.locator('#insertColumn').click();await expect(cells).toHaveCount(16);
+ await page.locator('#deleteRow').click();await expect(frame.locator('tr')).toHaveCount(3);
+ await page.locator('#undoBtn').click();await expect(frame.locator('tr')).toHaveCount(4);
+});
+test('export opens standalone with navigation and no editor markup',async({page,context})=>{
+ await page.goto('/');await page.locator('#addSlide').click();
+ const promise=page.waitForEvent('download');await page.locator('#exportBtn').click();const dl=await promise;
+ let html='';for await(const c of await dl.createReadStream())html+=c;
+ const exported=await context.newPage();await exported.setContent(html);
+ await expect(exported.locator('#counter')).toHaveText('1 / 2');await exported.locator('#next').click();await expect(exported.locator('#counter')).toHaveText('2 / 2');
+ expect(html).not.toContain('data-editor-only');expect(html).not.toContain('contenteditable="true"');
+});
