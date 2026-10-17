@@ -23,7 +23,7 @@ if(existsSync(stateFile)){
 save();
 async function run(number){
  const started=Date.now(),log=path.join(directory,`run-${Date.now()}.log`);let output='';
- const specs=number%5===0?[]:['tests/browser/react-text.spec.js','tests/browser/runtime-failure.spec.js'];
+ const specs=number%5===0?[]:['tests/browser/react-text.spec.js','tests/browser/runtime-failure.spec.js','tests/browser/startup.spec.js'];
  const args=[path.join(root,'node_modules','@playwright','test','cli.js'),'test',...specs,'--output',path.join(directory,'artifacts-'+started),'--reporter=line'];
  const result=await new Promise(resolve=>{
   const child=spawn(process.execPath,args,{cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe']});
