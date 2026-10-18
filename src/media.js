@@ -7,7 +7,7 @@ export function setup(editor) {
  const videoFile=document.createElement('input');videoFile.type='file';videoFile.accept='video/*';videoFile.hidden=true;videoFile.id='videoFile';document.body.append(videoFile);
  const dataURL=file=>new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(file);});
  async function upload(file,type,replace){
-  await editor.ready;if(editor.project.runtime)return;
+  await editor.ready;if(editor.runtimeLimited)return;
   if(!file)return;if(!file.type.startsWith(type+'/'))throw Error('지원하는 '+type+' 파일을 선택하세요.');
   editor.finishEdit();const src=await dataURL(file);let el=replace&&editor.selected?.tagName===(type==='image'?'IMG':'VIDEO')?editor.selected:null;
   if(!el){el=editor.document.createElement(type==='image'?'img':'video');el.dataset.srId=uid();el.dataset.kind=type;el.style.cssText='position:absolute;left:180px;top:150px;width:480px;height:300px;object-fit:contain;object-position:50% 50%;';(editor.document.querySelector('[data-sr-page]')||editor.document.body).append(el);}
