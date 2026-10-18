@@ -344,6 +344,7 @@ export const editor={get document(){return doc();},get selected(){return selecte
  insertSlides(slides){finishEdit();takeSnapshot();project.slides.splice(index+1,0,...slides);index++;commit({capture:false});return render();},
  goTo(i){finishEdit();takeSnapshot();index=Math.max(0,Math.min(project.slides.length-1,i));return render();},
  moveSlide(from,to){if(to<0||to>=project.slides.length)return;finishEdit();takeSnapshot();const active=current().id;const [s]=project.slides.splice(from,1);project.slides.splice(to,0,s);index=project.slides.findIndex(s=>s.id===active);commit({capture:false});},
+ presentationDeck(){return exportHTML(project);},
  presentationPage(i){const slide=project.slides[i];if(project.runtime&&Number.isInteger(slide.runtimePage))return exportHTML({...project,slides:[slide]});return slide.html;}
 };
 setupMedia(editor);setupTables(editor);setupAssets(editor);setupAudit(editor);

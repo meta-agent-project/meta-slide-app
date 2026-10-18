@@ -2,6 +2,27 @@ import {editorHTML,parse,serialize} from './document.js';
 import {setupThemes} from './themes.js';
 import {setupArrange,isLocked} from './arrange.js';
 
+// Runs inside the sandbox and uses the imported deck's own navigation controls.
+function runtimePresenterBridge(initial,channel){
+ let target=initial,seeking=true,ready=false,last=-1,scheduled=false;
+ const position=()=>Number(document.querySelector('.stage')?.getAttribute('aria-label')?.match(/^\s*(\d+)\s*\//)?.[1])-1;
+ const send=data=>parent.postMessage({type:'slide-room-presenter',...data},'*');
+ const schedule=()=>{if(!scheduled){scheduled=true;requestAnimationFrame(tick);}};
+ function tick(){
+  scheduled=false;const index=position();
+  if(!Number.isInteger(index)){schedule();return;}
+  if(seeking&&index!==target){document.querySelector(index<target?'#next':'#prev')?.click();schedule();return;}
+  const commanded=seeking;seeking=false;
+  if(!ready){ready=true;requestAnimationFrame(()=>send({ready:true}));}
+  else if(!commanded&&index!==last)send({index});
+  last=index;
+ }
+ window.addEventListener('message',e=>{if(e.data?.channel!==channel||e.data?.type!=='slide-room-presenter-goto'||!Number.isInteger(e.data.index))return;target=e.data.index;seeking=true;schedule();});
+ document.addEventListener('click',e=>{const b=e.target.closest('#next,#prev');if(!e.isTrusted||!b||b.disabled)return;e.preventDefault();e.stopImmediatePropagation();send({direction:b.id==='next'?1:-1});},true);
+ new MutationObserver(schedule).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['aria-label']});
+ schedule();
+}
+
 export function setupWorkspace(editor){
  const $=s=>document.querySelector(s);
  setupThemes(editor);setupArrange(editor);
@@ -52,17 +73,36 @@ export function setupWorkspace(editor){
 function setupPresenter(editor){
  const $=s=>document.querySelector(s);
  document.body.insertAdjacentHTML('beforeend','<dialog id="presenterDialog" class="studio-dialog presenter-dialog"><div class="dialog-heading"><div><span class="eyebrow">PRESENTER VIEW</span><h2>발표자 화면</h2></div><div><button id="audienceBtn">청중 화면 열기</button><button data-close="presenterDialog">발표 종료</button></div></div><div class="presenter-layout"><section><div class="presenter-canvas"><iframe id="presenterCurrent" sandbox="allow-scripts" title="현재 슬라이드"></iframe></div><div class="presenter-navigation"><button id="presenterPrev">← 이전</button><span id="presenterCounter"></span><button id="presenterNext">다음 →</button><time id="presenterClock">00:00</time><button id="resetClock">시간 초기화</button></div></section><aside><h3>다음 슬라이드</h3><div class="presenter-next"><iframe id="presenterNextFrame" sandbox="" title="다음 슬라이드"></iframe></div><h3>발표 노트</h3><p id="presenterNotes"></p></aside></div><p id="presenterStatus" role="status"></p></dialog>');
- let pageIndex=0,audience=null,started=0,timer=null;
- function source(i){const d=parse(editor.presentationPage(i)),script=d.createElement('script');script.textContent=`document.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select,[contenteditable]'))return;let direction=['ArrowRight','PageDown',' '].includes(e.key)?1:['ArrowLeft','PageUp'].includes(e.key)?-1:0;if(direction){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:'slide-room-presenter',direction},'*');}},true);`;d.head.prepend(script);return serialize(d);}
- function syncAudience(){if(!audience||audience.closed)return;const frame=audience.document.querySelector('iframe');frame.srcdoc=source(pageIndex);audience.document.title=`${pageIndex+1} / ${editor.project.slides.length} · ${editor.project.title}`;}
- function show(i){pageIndex=Math.max(0,Math.min(editor.project.slides.length-1,i));const s=editor.project.slides[pageIndex];$('#presenterCurrent').srcdoc=source(pageIndex);$('#presenterNextFrame').srcdoc=editor.project.slides[pageIndex+1]?editorHTML(editor.project.slides[pageIndex+1].html):'<p style="font:48px sans-serif;padding:80px">마지막 슬라이드입니다.</p>';$('#presenterNotes').textContent=s.notes||'이 페이지의 발표 노트가 없습니다.';$('#presenterCounter').textContent=`${pageIndex+1} / ${editor.project.slides.length}`;$('#presenterPrev').disabled=pageIndex===0;$('#presenterNext').disabled=pageIndex===editor.project.slides.length-1;syncAudience();}
- const fit=()=>{for(const id of ['presenterCurrent','presenterNextFrame']){const f=$('#'+id);f.style.transform=`scale(${f.parentElement.clientWidth/1280})`;}};
+ let pageIndex=0,audience=null,started=0,timer=null,deckHTML=null;const channel=crypto.randomUUID();
+ const transitions=new Map();
+ function swapFrame(frame,html,runtime=false){
+  const container=frame.parentElement;transitions.get(container)?.();
+  const next=frame.cloneNode(false),id=frame.id;next.removeAttribute('id');next.dataset.pending='';next.style.opacity='0';next.style.pointerEvents='none';next.setAttribute('aria-hidden','true');next.tabIndex=-1;
+  let cancelled=false,painting=false;const host=frame.ownerDocument.defaultView;next.dataset.runtime=String(runtime);
+  const cancel=()=>{cancelled=true;next.onload=null;host.removeEventListener('message',readyMessage);next.remove();transitions.delete(container);};transitions.set(container,cancel);
+  const paint=()=>{if(painting)return;painting=true;requestAnimationFrame(()=>requestAnimationFrame(()=>{
+   if(cancelled||!frame.isConnected)return;
+   const focused=frame.ownerDocument.activeElement===frame;
+   next.style.transform=frame.style.transform;next.style.opacity='';next.style.pointerEvents='';next.removeAttribute('aria-hidden');next.removeAttribute('tabindex');delete next.dataset.pending;
+   if(id)next.id=id;frame.remove();host.removeEventListener('message',readyMessage);transitions.delete(container);if(focused)next.focus({preventScroll:true});
+  }));};
+  const readyMessage=e=>{if(e.source===next.contentWindow&&e.data?.type==='slide-room-presenter'&&e.data.ready)paint();};
+  if(runtime)host.addEventListener('message',readyMessage);else next.onload=paint;
+  next.srcdoc=html;container.append(next);
+ }
+ function cancelTransitions(){for(const cancel of [...transitions.values()])cancel();}
+
+ function source(i){const d=parse(deckHTML??editor.presentationPage(i)),script=d.createElement('script');script.textContent=`document.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select,[contenteditable]'))return;let direction=['ArrowRight','PageDown',' '].includes(e.key)?1:['ArrowLeft','PageUp'].includes(e.key)?-1:0;if(direction){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:'slide-room-presenter',direction},'*');}},true);`;d.head.prepend(script);if(deckHTML){const bridge=d.createElement('script');bridge.textContent='('+runtimePresenterBridge.toString()+')('+i+','+JSON.stringify(channel)+');';d.head.append(bridge);}return serialize(d);}
+ function renderFrame(frame){if(deckHTML&&frame.dataset.runtime==='true'){frame.contentWindow.postMessage({type:'slide-room-presenter-goto',channel,index:pageIndex},'*');return;}swapFrame(frame,source(pageIndex),!!deckHTML);}
+ function syncAudience(){if(!audience||audience.closed)return;const frame=audience.document.querySelector('iframe:not([data-pending])');renderFrame(frame);audience.document.title=`${pageIndex+1} / ${editor.project.slides.length} · ${editor.project.title}`;}
+ function show(i,force=false){const next=Math.max(0,Math.min(editor.project.slides.length-1,i));if(!force&&next===pageIndex)return;pageIndex=next;const s=editor.project.slides[pageIndex];renderFrame($('#presenterCurrent'));$('#presenterNextFrame').srcdoc=editor.project.slides[pageIndex+1]?editorHTML(editor.project.slides[pageIndex+1].html):'<p style="font:48px sans-serif;padding:80px">마지막 슬라이드입니다.</p>';$('#presenterNotes').textContent=s.notes||'이 페이지의 발표 노트가 없습니다.';$('#presenterCounter').textContent=`${pageIndex+1} / ${editor.project.slides.length}`;$('#presenterPrev').disabled=pageIndex===0;$('#presenterNext').disabled=pageIndex===editor.project.slides.length-1;syncAudience();}
+ const fit=()=>{for(const id of ['presenterCurrent','presenterNextFrame']){const f=$('#'+id);for(const child of f.parentElement.querySelectorAll('iframe'))child.style.transform=`scale(${f.parentElement.clientWidth/1280})`;}};
  new ResizeObserver(fit).observe($('.presenter-canvas'));new ResizeObserver(fit).observe($('.presenter-next'));
- $('#presenterBtn').onclick=()=>{editor.finishEdit();editor.snapshot();started=Date.now();$('#presenterStatus').textContent=editor.project.runtime?'원본 실행형 슬라이드는 원본 재생 화면을 유지합니다.':'청중 화면을 다른 모니터로 옮겨 발표할 수 있습니다.';$('#presenterDialog').showModal();show(editor.index);fit();clearInterval(timer);timer=setInterval(()=>{const seconds=Math.floor((Date.now()-started)/1000);$('#presenterClock').textContent=String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');},1000);};
+ $('#presenterBtn').onclick=()=>{editor.finishEdit();editor.snapshot();deckHTML=editor.project.runtime?editor.presentationDeck():null;started=Date.now();$('#presenterStatus').textContent=editor.project.runtime?'원본 실행형 슬라이드는 원본 재생 화면을 유지합니다.':'청중 화면을 다른 모니터로 옮겨 발표할 수 있습니다.';$('#presenterDialog').showModal();show(editor.index,true);fit();clearInterval(timer);timer=setInterval(()=>{const seconds=Math.floor((Date.now()-started)/1000);$('#presenterClock').textContent=String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');},1000);};
  $('#presenterPrev').onclick=()=>show(pageIndex-1);$('#presenterNext').onclick=()=>show(pageIndex+1);$('#resetClock').onclick=()=>{started=Date.now();$('#presenterClock').textContent='00:00';};
- window.addEventListener('message',e=>{if($('#presenterDialog').open&&e.source===$('#presenterCurrent').contentWindow&&e.data?.type==='slide-room-presenter'&&[-1,1].includes(e.data.direction))show(pageIndex+e.data.direction);});
+ window.addEventListener('message',e=>{if($('#presenterDialog').open&&e.source===$('#presenterCurrent').contentWindow&&e.data?.type==='slide-room-presenter'){if([-1,1].includes(e.data.direction))show(pageIndex+e.data.direction);else if(Number.isInteger(e.data.index))show(e.data.index);}});
  $('#presenterDialog').addEventListener('keydown',e=>{if(['ArrowRight','PageDown',' '].includes(e.key)){e.preventDefault();show(pageIndex+1);}if(['ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();show(pageIndex-1);}});
- $('#audienceBtn').onclick=()=>{audience=window.open('about:blank','slide-room-audience','popup,width=1280,height=800');if(!audience){$('#presenterStatus').textContent='팝업이 차단되었습니다. 이 사이트의 팝업을 허용한 뒤 다시 열어주세요.';return;}const d=audience.document;d.open();d.write('<!doctype html><html><head><title>청중 화면</title><style>body{margin:0;background:#111;display:grid;place-items:center;height:100vh;overflow:hidden}main{position:relative}iframe{position:absolute;inset:0;border:0;width:1280px;height:720px;transform-origin:top left}button{position:fixed;right:16px;bottom:16px;background:#222;color:white;border:1px solid #666;padding:10px;border-radius:6px}</style></head><body><main><iframe sandbox="allow-scripts" title="발표 슬라이드"></iframe></main><button>전체 화면</button></body></html>');d.close();audience.addEventListener('message',e=>{if(e.source===d.querySelector('iframe').contentWindow&&e.data?.type==='slide-room-presenter'&&[-1,1].includes(e.data.direction))show(pageIndex+e.data.direction);});const fitAudience=()=>{if(audience.closed)return;const s=Math.min(audience.innerWidth/1280,audience.innerHeight/720),main=d.querySelector('main');main.style.width=1280*s+'px';main.style.height=720*s+'px';d.querySelector('iframe').style.transform=`scale(${s})`;};audience.addEventListener('resize',fitAudience);d.querySelector('button').onclick=()=>d.documentElement.requestFullscreen?.();audience.addEventListener('keydown',e=>{if(e.key==='ArrowRight')show(pageIndex+1);if(e.key==='ArrowLeft')show(pageIndex-1);});fitAudience();syncAudience();};
- $('#presenterDialog').addEventListener('close',()=>{clearInterval(timer);$('#presenterCurrent').srcdoc='';$('#presenterNextFrame').srcdoc='';if(audience&&!audience.closed)audience.close();audience=null;});
+ $('#audienceBtn').onclick=()=>{audience=window.open('about:blank','slide-room-audience','popup,width=1280,height=800');if(!audience){$('#presenterStatus').textContent='팝업이 차단되었습니다. 이 사이트의 팝업을 허용한 뒤 다시 열어주세요.';return;}const d=audience.document;d.open();d.write('<!doctype html><html><head><title>청중 화면</title><style>body{margin:0;background:#111;display:grid;place-items:center;height:100vh;overflow:hidden}main{position:relative}iframe{position:absolute;inset:0;border:0;width:1280px;height:720px;transform-origin:top left}button{position:fixed;right:16px;bottom:16px;background:#222;color:white;border:1px solid #666;padding:10px;border-radius:6px}</style></head><body><main><iframe sandbox="allow-scripts" title="발표 슬라이드"></iframe></main><button>전체 화면</button></body></html>');d.close();audience.addEventListener('message',e=>{if(e.source===d.querySelector('iframe:not([data-pending])').contentWindow&&e.data?.type==='slide-room-presenter'){if([-1,1].includes(e.data.direction))show(pageIndex+e.data.direction);else if(Number.isInteger(e.data.index))show(e.data.index);}});const fitAudience=()=>{if(audience.closed)return;const s=Math.min(audience.innerWidth/1280,audience.innerHeight/720),main=d.querySelector('main');main.style.width=1280*s+'px';main.style.height=720*s+'px';for(const frame of d.querySelectorAll('iframe'))frame.style.transform=`scale(${s})`;};audience.addEventListener('resize',fitAudience);d.querySelector('button').onclick=()=>d.documentElement.requestFullscreen?.();audience.addEventListener('keydown',e=>{if(e.key==='ArrowRight')show(pageIndex+1);if(e.key==='ArrowLeft')show(pageIndex-1);});fitAudience();syncAudience();};
+ $('#presenterDialog').addEventListener('close',()=>{cancelTransitions();clearInterval(timer);$('#presenterCurrent').srcdoc='';delete $('#presenterCurrent').dataset.runtime;$('#presenterNextFrame').srcdoc='';if(audience&&!audience.closed)audience.close();audience=null;});
 }
 
