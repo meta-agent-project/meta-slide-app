@@ -1,0 +1,21 @@
+import {test,expect} from '@playwright/test';
+test('twenty distinct layouts fit the slide and contain real editable lists, tables and images',async({page})=>{
+ await page.goto('/');await page.locator('#themeLibraryBtn').click();await expect(page.locator('#themePages .page-card')).toHaveCount(20);
+ const result=await page.evaluate(async()=>{const {themePages}=await import('/src/themes.js');const slides=themePages(),issues=[];let tables=0,lists=0,images=0;
+ for(const slide of slides){const frame=document.createElement('iframe');frame.style.cssText='position:fixed;width:1280px;height:720px;left:0;top:0;z-index:-1';document.body.append(frame);await new Promise(r=>{frame.onload=r;frame.srcdoc=slide.html;});const d=frame.contentDocument;await d.fonts.ready;tables+=d.querySelectorAll('table').length;lists+=d.querySelectorAll('ul li,ol li').length;images+=d.images.length;
+ for(const el of d.querySelectorAll('[data-sr-id]')){const r=el.getBoundingClientRect();if(r.left<-.5||r.top<-.5||r.right>1280.5||r.bottom>720.5||el.scrollWidth>el.clientWidth+2||el.scrollHeight>el.clientHeight+2)issues.push(slide.name+':'+el.tagName);}frame.remove();}
+ return {issues,tables,lists,images,names:slides.map(s=>s.name)};});
+ expect(result.issues).toEqual([]);expect(new Set(result.names).size).toBe(20);expect(result.tables).toBeGreaterThanOrEqual(2);expect(result.lists).toBeGreaterThan(10);expect(result.images).toBeGreaterThanOrEqual(4);
+ // A review sheet generated only in the test browser, never stored in the project.
+ await page.evaluate(async()=>{const {themePages}=await import('/src/themes.js');document.querySelector('dialog[open]')?.close();document.body.replaceChildren();document.body.style.cssText='display:grid;grid-template-columns:repeat(4,320px);gap:24px;padding:28px;margin:0;background:#eef0f2;height:auto;overflow:visible';document.documentElement.style.overflow='visible';await Promise.all(themePages().map((slide,i)=>new Promise(resolve=>{const card=document.createElement('article');card.style.cssText='width:320px;height:220px;overflow:hidden';const wrap=document.createElement('div');wrap.style.cssText='position:relative;width:320px;height:180px;overflow:hidden;background:white;border-radius:8px';const f=document.createElement('iframe');f.sandbox='';f.style.cssText='width:1280px;height:720px;transform:scale(.25);transform-origin:top left;border:0';f.onload=resolve;f.srcdoc=slide.html;wrap.append(f);const label=document.createElement('p');label.textContent=String(i+1).padStart(2,'0')+' · '+slide.name;label.style.cssText='font:15px sans-serif;color:#253f38;margin:10px 0';card.append(wrap,label);document.body.append(card);})));});
+ await page.screenshot({path:'validation/theme-layouts-20.png',fullPage:true});
+});
+test('image with right-hand bullet list and table cells remain editable after save and reload',async({page})=>{
+ await page.goto('/');await page.locator('#themeLibraryBtn').click();await page.getByRole('button',{name:'이미지 + 핵심 목록 가져오기',exact:true}).click();
+ const f=page.frameLocator('#canvas');await f.locator('li').first().dblclick();await f.locator('[contenteditable=true]').fill('수정한 핵심 내용');await page.locator('#finishTextBtn').click();
+ const img=await f.locator('img').boundingBox(),list=await f.locator('ul').boundingBox();expect(list.x).toBeGreaterThan(img.x+img.width);
+ await f.locator('img').dblclick();await page.locator('#imageFile').setInputFiles({name:'sample.svg',mimeType:'image/svg+xml',buffer:Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="500" height="300"><rect width="500" height="300" fill="teal"/></svg>')});
+ await page.locator('#themeLibraryBtn').click();await page.getByRole('button',{name:'비교 표 가져오기',exact:true}).click();await f.locator('td').first().dblclick();await f.locator('[contenteditable=true]').fill('수정한 셀');await page.locator('#finishTextBtn').click();
+ await expect(page.locator('#saveState')).toContainText('이 브라우저에 저장됨');await page.reload();await page.locator('.slide-item').nth(2).click();await expect(f.locator('td').first()).toHaveText('수정한 셀');
+ await page.locator('.slide-item').nth(1).click();await expect(f.locator('li').first()).toHaveText('수정한 핵심 내용');await expect(f.locator('img')).toHaveAttribute('src',/^data:image/);
+});
