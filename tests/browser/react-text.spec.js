@@ -51,7 +51,8 @@ test('actual 41-page React deck: source-bound text survives original runtime nav
 test('runtime imports allow only text content and shape movement/resizing, with geometry surviving playback',async({page})=>{
  test.skip(!existsSync(fixture));test.setTimeout(180000);await load(page);
  const f=page.frameLocator('#canvas');
- for(const id of ['duplicateBtn','deleteBtn','imageBtn','videoBtn','tableBtn','fontSize','colorInput','addSlide','removeSlide'])await expect(page.locator('#'+id)).toBeDisabled();
+ for(const id of ['duplicateBtn','deleteBtn','imageBtn','videoBtn','tableBtn','fontSize','colorInput','removeSlide'])await expect(page.locator('#'+id)).toBeDisabled();
+ await expect(page.locator('#addSlide')).toBeEnabled();await expect(page.locator('#duplicateSlide')).toBeEnabled();
  const heading=f.locator('h1');await heading.click();await expect(page.locator('#propX')).toBeDisabled();await expect(page.locator('#resizeHandle')).toBeHidden();
  await heading.press('Delete');await expect(heading).toHaveCount(1);await heading.press('Control+d');await expect(f.locator('h1')).toHaveCount(1);
  const shape=f.locator('svg[data-sr-geometry]').first();await expect(shape).toBeVisible();await shape.click({position:{x:20,y:20}});

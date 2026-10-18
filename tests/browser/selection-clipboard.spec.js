@@ -1,4 +1,10 @@
 import {test,expect} from '@playwright/test';
+test('browser clipboard events also copy and paste the selected slide',async({page})=>{
+ await page.goto('/');await page.locator('.slide-item').first().click();
+ await page.locator('.slide-item').first().dispatchEvent('copy');
+ await page.locator('.slide-item').first().dispatchEvent('paste');
+ await expect(page.locator('.slide-item')).toHaveCount(2);
+});
 test('marquee selects two objects, moves them together, and undoes in one step',async({page})=>{
  await page.goto('/');
  await page.locator('#projectFile').setInputFiles({name:'objects.html',mimeType:'text/html',buffer:Buffer.from('<html><body style="margin:0"><div data-kind="rect" id="a" style="position:absolute;left:100px;top:100px;width:80px;height:80px;background:red"></div><div data-kind="rect" id="b" style="position:absolute;left:230px;top:100px;width:80px;height:80px;background:blue"></div></body></html>')});
@@ -12,6 +18,9 @@ test('marquee selects two objects, moves them together, and undoes in one step',
  const movedA=await canvas.locator('#a').boundingBox(),movedB=await canvas.locator('#b').boundingBox();
  expect(Math.abs(movedA.x-a.x)).toBeGreaterThan(10);expect(movedB.x-b.x).toBeCloseTo(movedA.x-a.x,0);
  await page.locator('#undoBtn').click();expect((await canvas.locator('#a').boundingBox()).x).toBeCloseTo(a.x,0);expect((await canvas.locator('#b').boundingBox()).x).toBeCloseTo(b.x,0);
+ await canvas.locator('#a').click();await canvas.locator('#b').click({modifiers:['Shift']});await expect(page.locator('#selectionName')).toHaveText('2개 선택');
+ await canvas.locator('#b').press('ArrowRight');expect((await canvas.locator('#a').boundingBox()).x-a.x).toBeCloseTo(scale,0);expect((await canvas.locator('#b').boundingBox()).x-b.x).toBeCloseTo(scale,0);
+ await page.locator('#deleteBtn').click();await expect(canvas.locator('#a,#b')).toHaveCount(0);await page.locator('#undoBtn').click();await expect(canvas.locator('#a,#b')).toHaveCount(2);
 });
 test('sidebar copy pastes immediately after the chosen destination, with independent content',async({page})=>{
  await page.goto('/');await expect(page.locator('.slide-item')).toHaveCount(1);
