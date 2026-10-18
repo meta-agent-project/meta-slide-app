@@ -1,0 +1,15 @@
+import {test,expect} from '@playwright/test';
+const upload=page=>page.locator('#imageFile').setInputFiles({name:'wide.svg',mimeType:'image/svg+xml',buffer:Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="200"><rect width="600" height="200" fill="teal"/></svg>')});
+async function drag(page,selector,dx,dy){const h=await page.locator(selector).boundingBox();await page.mouse.move(h.x+h.width/2,h.y+h.height/2);await page.mouse.down();await page.mouse.move(h.x+h.width/2+dx,h.y+h.height/2+dy,{steps:5});await page.mouse.up();}
+test('cover default, contain fill choice and three resize directions survive reload',async({page})=>{
+ await page.goto('/');await upload(page);const img=page.frameLocator('#canvas').locator('img');await expect(img).toHaveCSS('object-fit','cover');await expect(page.locator('#cropMode')).toHaveValue('cover');
+ for(const mode of ['contain','fill','cover']){await page.locator('#cropMode').selectOption(mode);await expect(img).toHaveCSS('object-fit',mode);}
+ let r=await img.boundingBox();await drag(page,'.handle-e',35,0);let next=await img.boundingBox();expect(next.width).toBeGreaterThan(r.width+25);expect(next.height).toBeCloseTo(r.height,0);
+ r=next;await drag(page,'.handle-s',0,25);next=await img.boundingBox();expect(next.height).toBeGreaterThan(r.height+15);expect(next.width).toBeCloseTo(r.width,0);
+ r=next;await drag(page,'#resizeHandle',40,10);next=await img.boundingBox();expect(next.width/next.height).toBeCloseTo(r.width/r.height,2);await page.reload();await expect(img).toHaveCSS('object-fit','cover');
+});
+test('shape buttons have aligned toolbar and white black 1px defaults; centered text edits undo and persist',async({page})=>{
+ await page.goto('/');await expect(page.locator('#shapeSelect')).toHaveCount(0);const bounds=await page.locator('.insert-tools button').evaluateAll(bs=>bs.map(b=>b.getBoundingClientRect().bottom));expect(Math.max(...bounds)-Math.min(...bounds)).toBeLessThan(2);
+ for(const kind of ['rect','circle','rounded']){await page.locator(`[data-add=${kind}]`).click();const shape=page.frameLocator('#canvas').locator(`[data-kind=${kind}]`).last();await expect(shape).toHaveCSS('background-color','rgb(255, 255, 255)');await expect(shape).toHaveCSS('border-top-width','1px');await expect(shape).toHaveCSS('border-top-color','rgb(0, 0, 0)');await shape.dblclick();await page.frameLocator('#canvas').locator('[contenteditable=true]').fill('가운데 글자\n두 번째 줄');await page.locator('#finishTextBtn').click();await expect(shape).toHaveText('가운데 글자\n두 번째 줄');await expect(shape).toHaveCSS('text-align','center');await expect(shape).toHaveCSS('justify-content','center');await expect(shape).toHaveCSS('align-items','center');await page.locator('#undoBtn').click();await expect(shape).toHaveText('');await page.locator('#redoBtn').click();await expect(shape).toHaveText('가운데 글자\n두 번째 줄');}
+ await page.reload();await expect(page.frameLocator('#canvas').locator('[data-kind=rounded]').last()).toHaveText('가운데 글자\n두 번째 줄');
+});

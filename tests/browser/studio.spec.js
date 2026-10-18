@@ -60,7 +60,7 @@ test('layer visibility and locks persist across reload, and small text remains e
 });
 
 test('send backward keeps a shape visible above the page background',async({page})=>{
- await page.goto('/');await page.locator('#shapeSelect').selectOption('rect');await page.locator('#backBtn').click();const result=await page.frameLocator('#canvas').locator('[data-kind=rect]').evaluate(el=>{const r=el.getBoundingClientRect();return {z:Number(getComputedStyle(el).zIndex),hit:el.ownerDocument.elementFromPoint(r.x+20,r.y+20)===el};});expect(result.z).toBeGreaterThanOrEqual(0);expect(result.hit).toBe(true);
+ await page.goto('/');await page.locator('[data-add="rect"]').click();await page.locator('#backBtn').click();const result=await page.frameLocator('#canvas').locator('[data-kind=rect]').evaluate(el=>{const r=el.getBoundingClientRect();return {z:Number(getComputedStyle(el).zIndex),hit:el.ownerDocument.elementFromPoint(r.x+20,r.y+20)===el};});expect(result.z).toBeGreaterThanOrEqual(0);expect(result.hit).toBe(true);
 });
 
 

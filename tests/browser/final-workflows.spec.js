@@ -8,11 +8,11 @@ test('new project is undoable and slide ordering retains the right page',async({
  await page.locator('.slide-item').nth(1).click();await expect(page.frameLocator('#canvas').locator('h1')).toContainText('아이디어');
 });
 test('styles, shapes and replacing images persist through undo redo',async({page})=>{
- await page.goto('/');await page.locator('#shapeSelect').selectOption('arrow');
+ await page.goto('/');await page.locator('[data-add="arrow"]').click();
  const f=page.frameLocator('#canvas');await expect(f.locator('[data-kind=arrow]')).toHaveCount(1);
- await page.locator('#colorInput').fill('#112233');await page.locator('#colorInput').dispatchEvent('change');await expect(f.locator('[data-kind=arrow]')).toHaveCSS('background-color','rgb(17, 34, 51)');
- await page.locator('#undoBtn').click();await expect(f.locator('[data-kind=arrow]')).not.toHaveCSS('background-color','rgb(17, 34, 51)');
- await page.locator('#redoBtn').click();await expect(f.locator('[data-kind=arrow]')).toHaveCSS('background-color','rgb(17, 34, 51)');
+ await page.locator('#colorInput').fill('#112233');await page.locator('#colorInput').dispatchEvent('change');await expect(f.locator('[data-kind=arrow] polygon')).toHaveCSS('fill','rgb(17, 34, 51)');
+ await page.locator('#undoBtn').click();await expect(f.locator('[data-kind=arrow] polygon')).not.toHaveCSS('fill','rgb(17, 34, 51)');
+ await page.locator('#redoBtn').click();await expect(f.locator('[data-kind=arrow] polygon')).toHaveCSS('fill','rgb(17, 34, 51)');
  const img=color=>({name:'image.svg',mimeType:'image/svg+xml',buffer:Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><rect width="120" height="80" fill="${color}"/></svg>`)});
  await page.locator('#imageFile').setInputFiles(img('red'));
  await page.locator('#imageFile').evaluate(el=>el.dataset.replace='true');await page.locator('#imageFile').setInputFiles(img('blue'));await expect(f.locator('img')).toHaveCount(1);await expect.poll(async()=>Buffer.from((await f.locator('img').getAttribute('src')).split(',')[1],'base64').toString()).toContain('fill="blue"');
