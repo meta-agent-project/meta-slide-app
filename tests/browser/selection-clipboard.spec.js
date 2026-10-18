@@ -1,4 +1,15 @@
 import {test,expect} from '@playwright/test';
+test('marquee transfers keyboard focus from a property field so Delete removes the selection and undo restores it',async({page})=>{
+ await page.goto('/');
+ await page.locator('#projectFile').setInputFiles({name:'delete.html',mimeType:'text/html',buffer:Buffer.from('<html><body style="margin:0"><div id="a" style="position:absolute;left:100px;top:100px;width:80px;height:80px;background:red"></div><div id="b" style="position:absolute;left:230px;top:100px;width:80px;height:80px;background:blue"></div><div id="c" style="position:absolute;left:600px;top:100px;width:80px;height:80px;background:green"></div></body></html>')});
+ const canvas=page.frameLocator('#canvas');await expect(canvas.locator('#a')).toBeVisible();
+ await page.locator('#projectName').focus();
+ const r=await page.locator('#canvas').boundingBox(),s=r.width/1280;
+ await page.mouse.move(r.x+60*s,r.y+60*s);await page.mouse.down();await page.mouse.move(r.x+350*s,r.y+210*s,{steps:8});await page.mouse.up();
+ await expect(page.locator('#selectionName')).toHaveText('2개 선택');
+ await page.keyboard.press('Delete');await expect(canvas.locator('#a,#b')).toHaveCount(0);await expect(canvas.locator('#c')).toHaveCount(1);
+ await page.keyboard.press('Control+z');await expect(canvas.locator('#a,#b,#c')).toHaveCount(3);
+});
 test('browser clipboard events also copy and paste the selected slide',async({page})=>{
  await page.goto('/');await page.locator('.slide-item').first().click();
  await page.locator('.slide-item').first().dispatchEvent('copy');

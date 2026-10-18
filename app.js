@@ -184,7 +184,7 @@ function bindDocument(){
  new ResizeObserver(updateBox).observe(d.body);
 }
 function startMarquee(e){
- e.preventDefault();select(null);e.target.setPointerCapture?.(e.pointerId);
+ e.preventDefault();$('#canvas').focus({preventScroll:true});select(null);e.target.setPointerCapture?.(e.pointerId);
  const d=doc(),start={x:e.clientX,y:e.clientY},box=d.createElement('div');box.dataset.editorOnly='';box.style.cssText='position:fixed;pointer-events:none;border:1px solid #5865e8;background:#5865e822;z-index:2147483647';d.body.append(box);
  let hits=[];
  const move=ev=>{const x=Math.min(start.x,ev.clientX),y=Math.min(start.y,ev.clientY),right=Math.max(start.x,ev.clientX),bottom=Math.max(start.y,ev.clientY);Object.assign(box.style,{left:x+'px',top:y+'px',width:right-x+'px',height:bottom-y+'px'});
