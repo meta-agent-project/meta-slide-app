@@ -156,7 +156,7 @@ export function captureRuntimeGeometry(project,slide,el){
  const path=el.dataset.srGeometry,key=slide.runtimePage+':'+path;
  project.runtime.geometry||={};
  const geometry=slide.runtimeGeometry??project.runtime.geometry;
- geometry[key]={page:slide.runtimePage,path,styles:Object.fromEntries(['translate','width','height','box-sizing'].map(p=>[p,el.style.getPropertyValue(p)]).filter(([,v])=>v))};
+ geometry[key]={page:slide.runtimePage,path,styles:Object.fromEntries(['translate','width','height','box-sizing','rotate','display'].map(p=>[p,el.style.getPropertyValue(p)]).filter(([,v])=>v))};
 }
 
 export function exportRuntimeHTML(project,{embed=true}={}){
@@ -170,7 +170,7 @@ export function exportRuntimeHTML(project,{embed=true}={}){
  const rules=mappedGeometry.map(g=>{
   if(!Number.isInteger(g.page)||g.page<0||!/^:nth-child\(\d+\)(>:nth-child\(\d+\))*$/.test(g.path))throw Error('도형 위치 정보가 올바르지 않습니다.');
   const styles=Object.entries(g.styles).map(([p,v])=>{
-   if(!['translate','width','height','box-sizing'].includes(p)||!CSS.supports(p,v)||/[{};]/.test(v))throw Error('도형 크기 정보가 올바르지 않습니다.');
+   if(!['translate','width','height','box-sizing','rotate','display'].includes(p)||!CSS.supports(p,v)||/[{};]/.test(v))throw Error('도형 크기 정보가 올바르지 않습니다.');
    return p+':'+v+'!important';
   }).join(';');
   return '.stage[aria-label^="'+(g.page+1)+' /"]>'+g.path+'{'+styles+'}';
