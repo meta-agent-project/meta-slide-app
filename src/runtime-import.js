@@ -1,4 +1,4 @@
-import {analyzeScript,findTextBinding,findTextBindings,applyTextEdits} from './runtime-source.js';
+import {analyzeScript,findTextBinding,findTextBindings,applyTextEdits,composeRuntimePages} from './runtime-source.js';
 
 const parse=html=>new DOMParser().parseFromString(html,'text/html');
 const serialize=d=>'<!doctype html>\n'+d.documentElement.outerHTML;
@@ -141,12 +141,13 @@ export async function importRuntimeHTML(source,name,{onProgress=()=>{},signal}={
  return {version:1,title:name.replace(/\.(html?|json)$/i,''),slides:pages,runtime:{version:1,kind:'react-slides-source',source,scriptIndex,bindings,edits:{},geometry:{}}};
 }
 
-export function captureRuntimeEdits(project,doc){
+export function captureRuntimeEdits(project,doc,slide){
  if(!project.runtime)return;
+ const edits=slide?.runtimeEdits??project.runtime.edits;
  for(const el of doc.querySelectorAll('[data-sr-source]')){
   const id=el.dataset.srSource,binding=project.runtime.bindings[id];if(!binding)throw Error('글자의 원본 연결 정보가 없습니다.');
   const text=el.textContent;
-  if(text===(binding.displayText??binding.text))delete project.runtime.edits[id];else project.runtime.edits[id]=text;
+  if(text===(binding.displayText??binding.text))delete edits[id];else edits[id]=text;
  }
 }
 
@@ -154,15 +155,19 @@ export function captureRuntimeGeometry(project,slide,el){
  if(!project.runtime||!el.hasAttribute('data-sr-geometry'))return;
  const path=el.dataset.srGeometry,key=slide.runtimePage+':'+path;
  project.runtime.geometry||={};
- project.runtime.geometry[key]={page:slide.runtimePage,path,styles:Object.fromEntries(['translate','width','height','box-sizing'].map(p=>[p,el.style.getPropertyValue(p)]).filter(([,v])=>v))};
+ const geometry=slide.runtimeGeometry??project.runtime.geometry;
+ geometry[key]={page:slide.runtimePage,path,styles:Object.fromEntries(['translate','width','height','box-sizing'].map(p=>[p,el.style.getPropertyValue(p)]).filter(([,v])=>v))};
 }
 
 export function exportRuntimeHTML(project,{embed=true}={}){
  const runtime=project.runtime;if(runtime?.kind!=='react-slides-source')throw Error('지원하지 않는 원본 실행 형식입니다.');
  const d=parse(runtime.source),script=d.querySelectorAll('script')[runtime.scriptIndex];if(!script||script.src)throw Error('원본 스크립트를 찾지 못했습니다.');
  const edits=Object.entries(runtime.edits).map(([id,text])=>{const binding=runtime.bindings[id];if(!binding)throw Error('수정 위치를 찾지 못했습니다.');return {...binding,text};});
- script.textContent=applyTextEdits(script.textContent,edits);
- const rules=Object.values(runtime.geometry||{}).map(g=>{
+ const model=analyzeScript(script.textContent),changed=project.slides.length!==model.slides.length||project.slides.some((s,i)=>s.runtimePage!==i||s.runtimeEdits);
+ if(changed)script.textContent=composeRuntimePages(script.textContent,project.slides.map(s=>Number.isInteger(s.runtimePage)?{page:s.runtimePage,id:s.runtimeEdits?'sr-'+s.id:undefined,edits:Object.entries(s.runtimeEdits??runtime.edits).filter(([id])=>runtime.bindings[id]?.slideIndex===s.runtimePage).map(([id,text])=>({...runtime.bindings[id],text}))}:{id:'sr-'+s.id,name:s.name,html:s.html}));
+ else script.textContent=applyTextEdits(script.textContent,edits);
+ const mappedGeometry=project.slides.flatMap((s,page)=>Object.values(s.runtimeGeometry??runtime.geometry??{}).filter(g=>g.page===s.runtimePage).map(g=>({...g,page})));
+ const rules=mappedGeometry.map(g=>{
   if(!Number.isInteger(g.page)||g.page<0||!/^:nth-child\(\d+\)(>:nth-child\(\d+\))*$/.test(g.path))throw Error('도형 위치 정보가 올바르지 않습니다.');
   const styles=Object.entries(g.styles).map(([p,v])=>{
    if(!['translate','width','height','box-sizing'].includes(p)||!CSS.supports(p,v)||/[{};]/.test(v))throw Error('도형 크기 정보가 올바르지 않습니다.');
@@ -170,9 +175,9 @@ export function exportRuntimeHTML(project,{embed=true}={}){
   }).join(';');
   return '.stage[aria-label^="'+(g.page+1)+' /"]>'+g.path+'{'+styles+'}';
  });
- for(const [id,text]of Object.entries(runtime.edits))if(text.includes('\n')){
+ for(const [page,slide]of project.slides.entries())for(const [id,text]of Object.entries(slide.runtimeEdits??runtime.edits))if(text.includes('\n')){
   const b=runtime.bindings[id];
-  if(/^:nth-child\(\d+\)(>:nth-child\(\d+\))*$/.test(b.path))rules.push('.stage[aria-label^="'+(b.slideIndex+1)+' /"]>'+b.path+'{white-space:pre-wrap!important}');
+  if(b.slideIndex===slide.runtimePage&&/^:nth-child\(\d+\)(>:nth-child\(\d+\))*$/.test(b.path))rules.push('.stage[aria-label^="'+(page+1)+' /"]>'+b.path+'{white-space:pre-wrap!important}');
  }
  if(rules.length){const style=d.createElement('style');style.dataset.srRuntimeGeometry='';style.textContent=rules.join('\n');d.head.append(style);}
  if(embed){const data=d.createElement('script');data.id='slide-room-project';data.type='application/json';data.textContent=JSON.stringify(project).replaceAll('<','\\u003c');d.body.append(data);}

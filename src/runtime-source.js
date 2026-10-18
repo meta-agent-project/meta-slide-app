@@ -35,10 +35,23 @@ export function analyzeScript(source){
     }
    }
   });
-  return {id:id.value,start:render.start,end:render.end,tokens};
+  return {id:id.value,start:render.start,end:render.end,objectStart:node.start,objectEnd:node.end,tokens};
  });
  if(!slides.length)return null;
- return {source,slides};
+ return {source,slides,arrayStart:declaration.init.start,arrayEnd:declaration.init.end};
+}
+
+export function composeRuntimePages(source,pages){
+ const model=analyzeScript(source);if(!model)throw Error('원본 페이지 배열을 찾지 못했습니다.');
+ const objects=pages.map(page=>{
+  if(page.html!==undefined)return '{id:'+safeString(page.id)+',render:()=>React.createElement("iframe",{title:'+safeString(page.name)+',srcDoc:'+safeString(page.html)+',sandbox:"allow-scripts",style:{border:0,width:1280,height:720,position:"absolute",inset:0}})}';
+  const patched=applyTextEdits(source,page.edits),updated=analyzeScript(patched),slide=updated.slides[page.page];
+  if(!slide)throw Error('원본 페이지 연결이 올바르지 않습니다.');
+  const object=patched.slice(slide.objectStart,slide.objectEnd);
+  return page.id?'({...'+object+',id:'+safeString(page.id)+'})':object;
+ });
+ const result=source.slice(0,model.arrayStart)+'['+objects.join(',\n')+']'+source.slice(model.arrayEnd);
+ parse(result,{ecmaVersion:'latest',sourceType:'script'});return result;
 }
 
 export function findTextBindings(model,index,text){
