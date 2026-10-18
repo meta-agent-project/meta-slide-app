@@ -32,7 +32,7 @@ function toast(msg){$('#toast').textContent=msg;$('#toast').style.opacity=1;clea
 const current=()=>project.slides[index];
 const runtimeLimited=()=>!!project.runtime&&Number.isInteger(current()?.runtimePage);
 const doc=()=>canvas.contentDocument;
-function nodeName(el){return ({text:'텍스트',image:'이미지',video:'영상',rect:'사각형',rounded:'둥근 사각형',circle:'원',line:'선',arrow:'화살표',table:'표',group:'묶음'}[el?.dataset.kind])||({svg:'SVG · 묶음',IMG:'이미지',VIDEO:'영상',CANVAS:'동적 그림',IFRAME:'외부 콘텐츠',TABLE:'표',TD:'표 셀',TH:'표 셀',DIV:'묶음',SECTION:'묶음',H1:'제목',H2:'제목',H3:'제목',P:'본문',SPAN:'글자'}[el?.tagName])||el?.tagName?.toLowerCase()||'슬라이드 배경';}
+function nodeName(el){if(el?.dataset.srRole)return ({chapter:"대제목(장 제목)",section:"중제목(절 제목)",body:"본문"}[el.dataset.srRole]||el.dataset.srRole);return ({text:'텍스트',image:'이미지',video:'영상',rect:'사각형',rounded:'둥근 사각형',circle:'원',line:'선',arrow:'화살표',table:'표',group:'묶음'}[el?.dataset.kind])||({svg:'SVG · 묶음',IMG:'이미지',VIDEO:'영상',CANVAS:'동적 그림',IFRAME:'외부 콘텐츠',TABLE:'표',TD:'표 셀',TH:'표 셀',DIV:'묶음',SECTION:'묶음',H1:'제목',H2:'제목',H3:'제목',P:'본문',SPAN:'글자'}[el?.tagName])||el?.tagName?.toLowerCase()||'슬라이드 배경';}
 function isText(el){if(runtimeLimited())return !!el?.hasAttribute('data-sr-source');return el && !el.closest('svg')&&!['IMG','VIDEO','IFRAME','CANVAS','TABLE'].includes(el.tagName)&&(!el.children.length||/^(H[1-6]|P|SPAN|LI|TD|TH|BLOCKQUOTE)$/.test(el.tagName))&&!['rect','rounded','circle','line','arrow'].includes(el.dataset.kind);}
 function takeSnapshot(){
  if(!doc()?.body)return;
