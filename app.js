@@ -131,15 +131,16 @@ function updateRuntimePermissions(){
 }
 function selectionRect(){return bounds(selectedItems.filter(el=>el.isConnected));}
 function selectMany(items){items=[...new Set(items)].filter(el=>el.isConnected&&!isLocked(el)&&!items.some(parent=>parent!==el&&parent.contains(el)));select(items[0]||null);selectedItems=items;if(items.length>1){$('#selectionName').textContent=items.length+'개 선택';$('#elementProps').hidden=true;$('#editTextBtn').disabled=true;$('#resizeHandle').hidden=true;}updateBox();document.dispatchEvent(new Event('selection-changed'));}
-function updateBox(){$('#stage').style.setProperty('--ui-scale',String(1/scale));updateRuntimePositions();const box=$('#selectionBox');if(runtimeInteractive||editing||!selected||!selected.isConnected||isLocked(selected)){box.hidden=true;return;}const r=selectionRect();box.hidden=false;box.classList.toggle('multiple',selectedItems.length>1);box.classList.toggle('no-resize',runtimeLimited()&&!selected.hasAttribute('data-sr-geometry'));Object.assign(box.style,{left:r.x+'px',top:r.y+'px',width:r.width+'px',height:r.height+'px'});$('#objectBadge').textContent=(selectedItems.length>1?selectedItems.length+'개':nodeName(selected))+' · 이동';const nearTop=r.y*scale<40;$('#objectBadge').style.top=nearTop?(r.height+10)+'px':'';$('#objectBadge').style.transformOrigin=nearTop?'left top':'left bottom';}
-function updateRuntimePositions(){for(const {el,wrapper,frame,rect}of runtimeObjects){if(!el.isConnected)continue;const r=getRect(el);Object.assign(wrapper.style,{left:r.x+'px',top:r.y+'px',width:r.width+'px',height:r.height+'px'});frame.style.transform=`scale(${r.width/rect.width},${r.height/rect.height})`;}}
+function updateBox(){$('#stage').style.setProperty('--ui-scale',String(1/scale));updateRuntimePositions();const box=$('#selectionBox');if(runtimeInteractive||editing||!selected||!selected.isConnected||isLocked(selected)){box.hidden=true;return;}const r=selectionRect();box.hidden=false;box.classList.toggle('rotation-below',r.y*scale<65);box.classList.toggle('multiple',selectedItems.length>1);box.classList.toggle('no-resize',runtimeLimited()&&!selected.hasAttribute('data-sr-geometry'));Object.assign(box.style,{left:r.x+'px',top:r.y+'px',width:r.width+'px',height:r.height+'px'});$('#objectBadge').textContent=(selectedItems.length>1?selectedItems.length+'개':nodeName(selected))+' · 이동';const nearTop=r.y*scale<40;$('#objectBadge').style.top=nearTop?(r.height+10)+'px':'';$('#objectBadge').style.transformOrigin=nearTop?'left top':'left bottom';}
+function runtimeBounds(el){const bounds=getRect(el),rotation=el.ownerDocument.defaultView.getComputedStyle(el).rotate,style=el.style.cssText;el.style.setProperty('rotate','none','important');const local=getRect(el);el.style.cssText=style;return {x:bounds.x+(bounds.width-local.width)/2,y:bounds.y+(bounds.height-local.height)/2,width:local.width,height:local.height,rotation,local};}
+function updateRuntimePositions(){for(const {el,wrapper,frame,rect}of runtimeObjects){if(!el.isConnected)continue;const r=runtimeBounds(el);Object.assign(wrapper.style,{left:r.x+'px',top:r.y+'px',width:r.width+'px',height:r.height+'px',rotate:r.rotation});frame.style.transform=`scale(${r.width/rect.width},${r.height/rect.height})`;}}
 function syncRuntime(){
  runtimeObjects.forEach(x=>x.wrapper.remove());runtimeObjects=[];if(!doc()?.body)return;
  if(runtimeLimited()){$('#runtimeModeBtn').hidden=true;return;}
  const original=parse(current().html);
  for(const source of original.body.querySelectorAll('canvas,iframe,object,embed,[data-sr-opaque]')){
   if(source.parentElement.closest('canvas,iframe,object,embed,[data-sr-opaque]'))continue;
-  const el=doc().querySelector(`[data-sr-id="${source.dataset.srId}"]`);if(!el)continue;const r=getRect(el);if(!r.width||!r.height)continue;
+  const el=doc().querySelector(`[data-sr-id="${source.dataset.srId}"]`);if(!el)continue;const r=runtimeBounds(el).local;if(!r.width||!r.height)continue;
   const wrapper=document.createElement('div');wrapper.className='runtime-object';const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts');frame.title='동적 오브젝트 미리보기';
   wrapper.onpointerdown=e=>{if(runtimeInteractive||e.button!==0)return;finishEdit();select(el);e.preventDefault();wrapper.setPointerCapture(e.pointerId);startMove(e,el,false);};
   let rect=r;
@@ -148,7 +149,7 @@ function syncRuntime(){
    // duplicate layout, font timing drift, and incorrect nested pointer coordinates.
    rect={width:el.clientWidth||r.width,height:el.clientHeight||r.height};frame.srcdoc=source.getAttribute('srcdoc');
    frame.style.cssText=`position:absolute;left:0;top:0;width:${rect.width}px;height:${rect.height}px;border:0;transform-origin:top left;`;
-  }else{frame.srcdoc=current().html;frame.style.cssText=`position:absolute;left:${-r.x}px;top:${-r.y}px;width:1280px;height:720px;border:0;transform-origin:${r.x}px ${r.y}px;`;}
+  }else{const saved=source.style.cssText;source.style.setProperty('rotate','none','important');frame.srcdoc='<!doctype html>'+original.documentElement.outerHTML;source.style.cssText=saved;frame.style.cssText=`position:absolute;left:${-r.x}px;top:${-r.y}px;width:1280px;height:720px;border:0;transform-origin:${r.x}px ${r.y}px;`;}
   wrapper.append(frame);$('#selectionBox').before(wrapper);runtimeObjects.push({el,wrapper,frame,rect});
  }$('#runtimeModeBtn').hidden=!runtimeObjects.length;updateRuntimePositions();
 }
@@ -341,6 +342,7 @@ async function restore(){try{const db=await database(),p=await new Promise((reso
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 // Feature modules share the selection and commit boundary, not duplicate editor state.
 export const editor={get document(){return doc();},get selected(){return selected;},get selectedItems(){return selectedItems;},get project(){return project;},get index(){return index;},get runtimeLimited(){return runtimeLimited();},get limited(){return runtimeLimited();},select,selectMany,commit,toast,finishEdit,beginEdit,render,download,add,isText,translate,resizeTo,changeStyle,fit,saveLocal,snapshot:takeSnapshot,
+ refreshSelection:updateBox,captureGeometry(el){captureRuntimeGeometry(project,current(),el);},
  setScale(value){zoom=1;fit();zoom=value/scale;fit();},
  insertSlides(slides){finishEdit();takeSnapshot();project.slides.splice(index+1,0,...slides);index++;commit({capture:false});return render();},
  goTo(i){finishEdit();takeSnapshot();index=Math.max(0,Math.min(project.slides.length-1,i));return render();},
