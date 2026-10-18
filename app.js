@@ -318,7 +318,7 @@ function download(data,name,type){const url=URL.createObjectURL(new Blob([data],
 function saveProject(){finishEdit();takeSnapshot();download(JSON.stringify(project,null,2),project.title+'.slide.json','application/json');saveLocal();toast('편집용 프로젝트를 저장했습니다.');}
 $('#saveBtn').onclick=saveProject;
 $('#exportBtn').onclick=()=>{finishEdit();takeSnapshot();download(exportHTML(project),project.title+'.html','text/html');toast('HTML을 내려받았습니다. 다시 열어 편집할 수 있습니다.');};
-$('#previewBtn').onclick=()=>{finishEdit();takeSnapshot();$('#previewFrame').srcdoc=exportHTML(project);$('#preview').showModal();};$('#closePreview').onclick=()=>{$('#preview').close();$('#previewFrame').srcdoc='';};
+$('#previewBtn').onclick=()=>{finishEdit();takeSnapshot();const html=exportHTML(project);$('#preview').showModal();void $('#previewFrame').offsetHeight;$('#previewFrame').srcdoc=html;};$('#closePreview').onclick=()=>{$('#preview').close();$('#previewFrame').srcdoc='';};
 // Project saves use IndexedDB so uploaded images do not hit localStorage's small quota.
 let dbPromise;
 function database(){return dbPromise||=new Promise((resolve,reject)=>{const r=indexedDB.open('slide-room',1);r.onupgradeneeded=()=>r.result.createObjectStore('projects');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
