@@ -16,3 +16,8 @@ Thumbs.db
 validation/
 .local/
 
+
+test-results-clipart/
+test-results-dot/
+test-results-dot-recheck/
+test-results-assets-final/

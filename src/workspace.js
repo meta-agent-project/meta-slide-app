@@ -1,3 +1,4 @@
+import {setupClipart} from './clipart.js';
 import {editorHTML,parse,serialize} from './document.js';
 import {setupThemes} from './themes.js';
 import {setupArrange,isLocked} from './arrange.js';
@@ -25,7 +26,7 @@ function runtimePresenterBridge(initial,channel){
 
 export function setupWorkspace(editor){
  const $=s=>document.querySelector(s);
- setupThemes(editor);setupArrange(editor);
+ setupThemes(editor);setupArrange(editor);setupClipart(editor);
  const previewResize=new ResizeObserver(entries=>{for(const {target}of entries){const frame=target.querySelector('iframe');if(frame)frame.style.transform=`scale(${target.clientWidth/1280})`;}});
  const previewMutation=new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1){if(node.matches('.page-preview'))previewResize.observe(node);node.querySelectorAll('.page-preview').forEach(el=>previewResize.observe(el));}for(const record of records)for(const node of record.removedNodes)if(node.nodeType===1){if(node.matches('.page-preview'))previewResize.unobserve(node);node.querySelectorAll('.page-preview').forEach(el=>previewResize.unobserve(el));}});previewMutation.observe(document.body,{childList:true,subtree:true});
  $('#saveBtn').textContent='프로젝트 저장';$('#saveBtn').title='편집용 .slide.json 파일 저장 · Ctrl+S';
