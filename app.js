@@ -179,7 +179,7 @@ function bindDocument(){
   e.preventDefault();e.target.setPointerCapture?.(e.pointerId);
   startMove(e,el,false);
  });
- d.addEventListener('dblclick',e=>{if(editing?.contains(e.target))return;e.preventDefault();const el=runtimeLimited()?targetAt(e):e.target.closest('td,th')||targetAt(e);if(isText(el))beginEdit(el,{x:e.clientX,y:e.clientY});else if(el?.tagName==='IMG'){$('#imageFile').dataset.replace='true';$('#imageFile').click();}});
+ d.addEventListener('dblclick',e=>{if(editing?.contains(e.target))return;e.preventDefault();const el=runtimeLimited()?targetAt(e):e.target.closest('td,th')||targetAt(e);if(isText(el))beginEdit(el,{x:e.clientX,y:e.clientY});else if(el?.tagName==='IMG'){select(el);$('#imageFile').dataset.replace='true';$('#imageFile').click();}});
  d.addEventListener('keydown',keyboard);
  d.addEventListener('paste',e=>{if(!editing)return;e.preventDefault();d.execCommand('insertText',false,e.clipboardData.getData('text/plain'));});
  new ResizeObserver(updateBox).observe(d.body);

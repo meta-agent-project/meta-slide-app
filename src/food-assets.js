@@ -1,0 +1,1 @@
+export const foodAssets=[['apple','사과','과일 빨간 사과'],['banana','바나나','과일 노란 바나나'],['bread','빵','식빵 토스트 아침'],['egg','달걀','계란 프라이 아침'],['pizza','피자','음식 치즈 피자'],['burger','햄버거','버거 패스트푸드'],['coffee','커피','음료 컵 카페'],['meal','식사 접시','밥 식사 점심 저녁']].map(([id,name,tags])=>({id:'food-'+id,name,tags,category:'음식',file:'food-'+id+'.svg',preview:'food-'+id+'.svg'}));
