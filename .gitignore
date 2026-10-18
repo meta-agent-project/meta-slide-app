@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 test-results/
+test-results-studio*/
 test-results-diagnostic/
 test-results-startup-diagnostic/
 playwright-report/

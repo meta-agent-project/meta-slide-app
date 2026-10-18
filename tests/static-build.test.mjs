@@ -10,4 +10,5 @@ test('hosted bundle includes editor modules without server or local workspace da
  const html=await readFile(path.join(out,'index.html'),'utf8');assert.match(html,/app\.js/);
  for(const file of ['app.js','style.css','src/document.js','src/import-adapters.js','src/runtime-import.js','src/runtime-source.js','src/vendor/acorn.js','src/vendor/ACORN-LICENSE','src/core.js','src/media.js','src/tables.js','src/assets.js','src/audit.js'])assert.ok((await readFile(path.join(out,file))).length);
  const entries=await readdir(out);assert.ok(!entries.includes('server.mjs'));assert.ok(!entries.includes('.local'));assert.ok(!entries.includes('node_modules'));
+ for(const file of ['studio.css','src/themes.js','src/arrange.js','src/workspace.js'])assert.ok((await readFile(path.join(out,file))).length);
 });

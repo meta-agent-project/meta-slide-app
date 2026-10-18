@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 test('new project is undoable and slide ordering retains the right page',async({page})=>{
- await page.goto('/');await page.locator('#newBtn').click();
+ await page.goto('/');await page.locator('#fileMenu summary').click();await page.locator('#newBtn').click();
  await expect(page.locator('.slide-item')).toHaveCount(1);await expect(page.frameLocator('#canvas').locator('[data-sr-id]')).toHaveCount(0);
  await page.locator('#undoBtn').click();await expect(page.frameLocator('#canvas').locator('h1')).toContainText('아이디어');
  await page.locator('#addSlide').click();await page.locator('[data-add="text"]').click();
@@ -20,7 +20,7 @@ test('styles, shapes and replacing images persist through undo redo',async({page
 test('autosave failure is visible and does not prevent file download',async({page})=>{
  await page.addInitScript(()=>{IDBObjectStore.prototype.put=function(){throw new DOMException('Quota exceeded','QuotaExceededError');};});
  await page.goto('/');await page.locator('[data-add="text"]').click();await expect(page.locator('#saveState')).toContainText('저장 실패');
- const promise=page.waitForEvent('download');await page.locator('#saveBtn').click();const dl=await promise;expect(dl.suggestedFilename()).toMatch(/\.slide\.json$/);
+ const promise=page.waitForEvent('download');await page.locator('#fileMenu summary').click();await page.locator('#saveBtn').click();const dl=await promise;expect(dl.suggestedFilename()).toMatch(/\.slide\.json$/);
 });
 test('external identifiers are normalized for safe selection',async({page})=>{
  await page.goto('/');await page.locator('#projectFile').setInputFiles({name:'ids.html',mimeType:'text/html',buffer:Buffer.from('<h1 data-sr-id="bad&quot;value">선택 가능</h1><p data-sr-id="same">첫째</p><p data-sr-id="same">둘째</p>')});

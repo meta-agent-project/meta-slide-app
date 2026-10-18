@@ -13,9 +13,9 @@ test('image upload and crop survive export, reimport and local restoration',asyn
  expect(html).toContain('data:image/svg+xml;base64,');expect(html).not.toContain('blob:');
  await page.locator('#projectFile').setInputFiles({name:'export.html',mimeType:'text/html',buffer:Buffer.from(html)});
  await expect(frame.locator('img')).toHaveCSS('object-position','30% 50%');
- await expect(page.locator('#saveState')).toHaveText('자동 저장됨');await page.reload();
+ await expect(page.locator('#saveState')).toHaveText('이 브라우저에 저장됨 · 방금');await page.reload();
  await expect(frame.locator('img')).toHaveCount(1);
- const savedPromise=page.waitForEvent('download');await page.locator('#saveBtn').click();
+ const savedPromise=page.waitForEvent('download');await page.locator('#fileMenu summary').click();await page.locator('#saveBtn').click();
  const saved=await savedPromise;let json='';for await(const chunk of await saved.createReadStream())json+=chunk;
  await page.locator('#projectFile').setInputFiles({name:'saved.slide.json',mimeType:'application/json',buffer:Buffer.from(json)});
  await expect(frame.locator('img')).toHaveCount(1);

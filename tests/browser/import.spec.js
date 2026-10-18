@@ -27,7 +27,7 @@ test('inline text edit, adding shapes, history and slide operations', async ({pa
  await frame.locator('[contenteditable="true"]').fill('사람이 완성한 강의');
  await page.locator('#selectionName').click();
  await expect(frame.locator('[data-kind="text"]').last()).toHaveText('사람이 완성한 강의');
- await page.locator('[data-add="rect"]').click();
+ await page.locator('#shapeSelect').selectOption('rect');
  await expect(frame.locator('[data-kind="rect"]')).toHaveCount(1);
  await page.locator('#duplicateBtn').click();
  await expect(frame.locator('[data-kind="rect"]')).toHaveCount(2);

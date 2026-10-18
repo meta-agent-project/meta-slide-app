@@ -14,7 +14,7 @@ test('text movement shows grab/grabbing and editing has an explicit exit',async(
  await page.locator('#finishTextBtn').click();await expect(title).not.toHaveAttribute('contenteditable','true');
  await expect(page.locator('#objectBadge')).toHaveCSS('cursor','grab');
  const before=await title.boundingBox(),handle=await page.locator('#objectBadge').boundingBox();
- await page.mouse.move(handle.x+handle.width/2,handle.y+handle.height/2);await page.mouse.down();await page.mouse.move(handle.x+handle.width/2+40,handle.y+handle.height/2+30);await page.mouse.up();
+ await page.keyboard.down('Alt');await page.mouse.move(handle.x+handle.width/2,handle.y+handle.height/2);await page.mouse.down();await page.mouse.move(handle.x+handle.width/2+40,handle.y+handle.height/2+30);await page.mouse.up();await page.keyboard.up('Alt');
  const after=await title.boundingBox();expect(after.x-before.x).toBeCloseTo(40,0);expect(after.y-before.y).toBeCloseTo(30,0);
 });
 
@@ -22,7 +22,7 @@ test('unavailable commands are disabled and alignment reports its state',async({
  await page.goto('/');await expect(page.locator('#deleteBtn')).toBeDisabled();await expect(page.locator('#duplicateBtn')).toBeDisabled();
  await expect(page.locator('#removeSlide')).toBeDisabled();
  await page.frameLocator('#canvas').locator('h1').click();await expect(page.locator('#deleteBtn')).toBeEnabled();
- await expect(page.locator('#alignBtn')).toContainText('왼쪽');await page.locator('#alignBtn').click();await expect(page.locator('#alignBtn')).toContainText('가운데');
+ await page.locator('[data-text-align=center]').click();await expect(page.locator('[data-text-align=center]')).toHaveAttribute('aria-pressed','true');await expect(page.frameLocator('#canvas').locator('h1')).toHaveCSS('text-align','center');
  await page.locator('#parentBtn').click();await expect(page.locator('#deleteBtn')).toBeDisabled();
 });
 
