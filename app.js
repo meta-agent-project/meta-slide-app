@@ -236,7 +236,7 @@ function startMove(e,el,resize){
  if(!resize&&selectedItems.length>1){startGroupMove(e);return;}
  if(runtimeLimited()&&!el.hasAttribute('data-sr-geometry'))return;
  const start={x:e.clientX,y:e.clientY},r=getRect(el),style=el.style.cssText;
- const inside=e.view===doc().defaultView;let moved=false;
+ const inside=e.target.ownerDocument===doc();let moved=false;
  const surface=inside?doc():document;
  const move=ev=>{
   let dx=(ev.clientX-start.x)/(inside?1:scale),dy=(ev.clientY-start.y)/(inside?1:scale);
@@ -253,7 +253,7 @@ function startMove(e,el,resize){
 function startGroupMove(e){
  const items=selectedItems.filter(el=>!isLocked(el)&&(!runtimeLimited()||el.hasAttribute('data-sr-geometry')));if(!items.length)return;
  if(runtimeLimited()&&items.length!==selectedItems.length){toast('원본 글자는 이동할 수 없습니다. 도형만 함께 선택하세요.');return;}
- const styles=items.map(el=>el.style.cssText),inside=e.view===doc().defaultView,surface=inside?doc():document,start={x:e.clientX,y:e.clientY};let moved=false;
+ const styles=items.map(el=>el.style.cssText),inside=e.target.ownerDocument===doc(),surface=inside?doc():document,start={x:e.clientX,y:e.clientY};let moved=false;
  const r=bounds(items);
  const move=ev=>{let dx=(ev.clientX-start.x)/(inside?1:scale),dy=(ev.clientY-start.y)/(inside?1:scale);if(!moved&&Math.abs(dx)+Math.abs(dy)<3)return;moved=true;({dx,dy}=snapMove(doc(),items,r,dx,dy,$('#smartGuides')?.checked&&!ev.altKey&&!runtimeLimited()));items.forEach((el,i)=>{el.style.cssText=styles[i];translate(el,dx,dy);});doc().documentElement.dataset.srDragging='move';updateBox();};
  const end=ev=>{surface.removeEventListener('pointermove',move);surface.removeEventListener('pointerup',end);surface.removeEventListener('pointercancel',end);clearGuides(doc());delete doc().documentElement.dataset.srDragging;if(ev.type==='pointercancel')items.forEach((el,i)=>el.style.cssText=styles[i]);else if(moved){items.forEach(el=>captureRuntimeGeometry(project,current(),el));commit();}updateBox();};
