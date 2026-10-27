@@ -51,7 +51,7 @@ test('actual 41-page React deck: source-bound text survives original runtime nav
 test('runtime imports allow only text content and shape movement/resizing, with geometry surviving playback',async({page})=>{
  test.skip(!existsSync(fixture));test.setTimeout(180000);await load(page);
  const f=page.frameLocator('#canvas');
- for(const id of ['duplicateBtn','deleteBtn','imageBtn','videoBtn','tableBtn','fontSize','colorInput'])await expect(page.locator('#'+id)).toBeDisabled();
+ for(const id of ['duplicateBtn','deleteBtn','imageBtn','tableBtn','fontSize','colorInput'])await expect(page.locator('#'+id)).toBeDisabled();
  for(const id of ['addSlide','removeSlide'])await expect(page.locator('#'+id)).toBeEnabled();
  const heading=f.locator('h1');await heading.click();await expect(page.locator('#propX')).toBeDisabled();await expect(page.locator('#resizeHandle')).toBeHidden();
  await heading.press('Delete');await expect(heading).toHaveCount(1);await heading.press('Control+d');await expect(f.locator('h1')).toHaveCount(1);

@@ -122,7 +122,7 @@ function select(el){
 function updateRuntimePermissions(){
  const limited=runtimeLimited(),shape=!!selected?.hasAttribute('data-sr-geometry');
  document.body.classList.toggle('runtime-source-mode',limited);
- for(const el of $$('[data-add],#imageBtn,#videoBtn,#tableBtn,#assetsBtn,#duplicateBtn,#deleteBtn,#opaqueBtn,#parentBtn,#fontFamily,#fontSize,#boldBtn,#alignBtn,#colorInput,#borderWidth,#borderColor,#backBtn,#frontBtn,#swatches button,#tableProps button,#tableProps input')){
+ for(const el of $$('[data-add],#imageBtn,#tableBtn,#assetsBtn,#duplicateBtn,#deleteBtn,#opaqueBtn,#parentBtn,#fontFamily,#fontSize,#boldBtn,#alignBtn,#colorInput,#borderWidth,#borderColor,#backBtn,#frontBtn,#swatches button,#tableProps button,#tableProps input')){
   if(limited){if(!el.hasAttribute('data-runtime-disabled'))el.dataset.runtimeDisabled=String(el.disabled);el.disabled=true;}
   else if(el.hasAttribute('data-runtime-disabled')){el.disabled=el.dataset.runtimeDisabled==='true';delete el.dataset.runtimeDisabled;}
  }

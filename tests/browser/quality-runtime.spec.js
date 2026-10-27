@@ -19,14 +19,14 @@ test('script-driven canvas has an isolated live object surface and remains movab
  await page.locator('.runtime-object').click();await page.locator('#propX').fill('240');await page.locator('#propX').press('Enter');
  await expect(page.locator('.runtime-object')).toHaveCSS('left','240px');
 });
-test('uploaded video plays in preview and survives export',async({page})=>{
+test('video already embedded in imported HTML survives preview and export',async({page})=>{
  await page.goto('/');
  const bytes=await page.evaluate(async()=>{
   const c=document.createElement('canvas');c.width=160;c.height=90;const ctx=c.getContext('2d'),stream=c.captureStream(10);const recorder=new MediaRecorder(stream,{mimeType:'video/webm'});const chunks=[];recorder.ondataavailable=e=>chunks.push(e.data);
   const done=new Promise(resolve=>recorder.onstop=async()=>resolve([...new Uint8Array(await new Blob(chunks).arrayBuffer())]));recorder.start();
   for(let i=0;i<10;i++){ctx.fillStyle=i%2?'#5566ee':'#ccddaa';ctx.fillRect(0,0,160,90);await new Promise(r=>setTimeout(r,100));}recorder.stop();stream.getTracks().forEach(t=>t.stop());return done;
  });
- await page.locator('#videoFile').setInputFiles({name:'lesson.webm',mimeType:'video/webm',buffer:Buffer.from(bytes)});
+ await page.locator('#projectFile').setInputFiles({name:'legacy.html',mimeType:'text/html',buffer:Buffer.from('<video controls width=320 height=180 src="data:video/webm;base64,'+Buffer.from(bytes).toString('base64')+'"></video>')});
  await expect(page.frameLocator('#canvas').locator('video')).toHaveAttribute('src',/^data:video/);
  await page.locator('#previewBtn').click();const v=page.frameLocator('#previewFrame').frameLocator('#deck iframe').locator('video');
  await v.evaluate(async el=>{el.muted=true;await el.play();});await expect.poll(()=>v.evaluate(el=>el.currentTime)).toBeGreaterThan(0);

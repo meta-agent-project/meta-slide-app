@@ -22,7 +22,7 @@ function writeTable(table,model) {
 }
 export function setup(editor) {
  const $=s=>document.querySelector(s);let active=null,anchor=null,end=null;
- $('#videoBtn').insertAdjacentHTML('afterend','<button id="tableBtn">▦ 표</button>');
+ $('#imageBtn').insertAdjacentHTML('afterend','<button id="tableBtn">▦ 표</button>');
  $('#elementProps').insertAdjacentHTML('beforeend','<section id="tableProps" hidden><h3>표 편집</h3><p class="muted">셀 클릭 → Shift+클릭으로 범위 선택<br>더블클릭으로 셀 내용 수정</p><div class="table-actions"><button id="mergeCells">셀 병합</button><button id="splitCell">셀 분할</button><button id="insertRow">행 추가</button><button id="deleteRow">행 삭제</button><button id="insertColumn">열 추가</button><button id="deleteColumn">열 삭제</button></div><label class="range-label">열 너비 <input id="columnWidth" type="number" min="30" value="160" aria-label="열 너비"></label><label class="range-label">셀 배경 <input id="cellColor" type="color" value="#ffffff" aria-label="셀 배경색"></label><label class="range-label">셀 테두리 <input id="cellBorder" type="color" value="#c5d1cb" aria-label="셀 테두리색"></label></section>');
  function coords(td){const m=readTable(td.closest('table'));const row=[...td.parentElement.cells].indexOf(td),r=[...td.closest('table').rows].indexOf(td.parentElement);return m.cells.filter(s=>s.r===r).sort((a,b)=>a.c-b.c)[row];}
  function highlight(){
